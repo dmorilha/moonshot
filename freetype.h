@@ -31,18 +31,23 @@ struct Face {
     return *this;
   }
 
-  std::size_t lineHeight() const {
-    return lineHeight_;
+  std::size_t descender() const {
+    return descender_;
   }
 
   std::size_t glyphWidth() const {
     return glyphWidth_;
   }
 
+  std::size_t lineHeight() const {
+    return lineHeight_;
+  }
+
   Glyph glyph(const char) const;
 
 // private:
   FT_Face face_ = nullptr;
+  std::size_t descender_ = 0;
   std::size_t lineHeight_ = 0;
   std::size_t glyphWidth_ = 0;
 };

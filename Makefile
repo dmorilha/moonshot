@@ -12,3 +12,6 @@ main: main.cc freetype.cc freetype.h poller.cc poller.h terminal.cc terminal.h x
 	$(CXX) $(CXX_FLAGS) -c -o terminal.o terminal.cc;
 	$(CXX) $(CXX_FLAGS) -c -o main.o $<
 	$(CXX) $(CXX_FLAGS) $(LIBS) -o $@ freetype.o main.o terminal.o poller.o xdg-shell.o wayland.o
+
+clean:
+	rm -v main *.o

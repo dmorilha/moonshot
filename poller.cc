@@ -1,3 +1,4 @@
+#include <iostream>
 #include <cassert>
 
 #include "poller.h"
@@ -16,19 +17,19 @@ void Poller::poll() {
       result = ppoll(files_.data(), files_.size(), &time_, nullptr);
       for (std::size_t index = 0; index < files_.size(); ++index) {
         // replace by a callback.
-        if (0 != files_[index].revents & POLLIN) {
+        if (0 != (files_[index].revents & POLLIN)) {
           events_[index]->pollin();
         }
 
-        if (0 != files_[index].revents & POLLOUT) {
+        if (0 != (files_[index].revents & POLLOUT)) {
           events_[index]->pollout();
         }
 
-        if (0 != files_[index].revents & POLLERR) {
+        if (0 != (files_[index].revents & POLLERR)) {
           events_[index]->pollerr();
         }
 
-        if (0 != files_[index].revents & POLLHUP) {
+        if (0 != (files_[index].revents & POLLHUP)) {
           events_[index]->pollhup();
         }
       }

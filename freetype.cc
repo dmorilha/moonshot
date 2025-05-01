@@ -58,8 +58,34 @@ Face Library::load(const std::string & filename, const std::size_t size, const s
     }
   }
 
+  face.descender_ = face.face_->size->metrics.descender / 64;
   face.glyphWidth_ = face.face_->glyph->advance.x / 64;
   face.lineHeight_ = face.face_->size->metrics.height / 64;
+
+#if 0
+  std::cout
+    << "face.face_->size->metrics.ascender "
+    << face.face_->size->metrics.ascender
+    << "\nface.face_->size->metrics.descender "
+    << face.face_->size->metrics.descender
+    << "\nface.face_->size->metrics.height "
+    << face.face_->size->metrics.height
+    << "\nface.face_->size->metrics.max_advance "
+    << face.face_->size->metrics.max_advance
+    << "\nface.face_->size->metrics.x_ppem "
+    << face.face_->size->metrics.x_ppem
+    << "\nface.face_->size->metrics.x_scale "
+    << face.face_->size->metrics.x_scale
+    << "\nface.face_->size->metrics.y_ppem "
+    << face.face_->size->metrics.y_ppem
+    << "\nface.face_->size->metrics.y_scale "
+    << face.face_->size->metrics.y_scale
+    << "\nface.face_->glyph->advance.x "
+    << face.face_->glyph->advance.x
+    << "\nface.face_->glyph->advance.y "
+    << face.face_->glyph->advance.y
+    << std::endl;
+#endif
 
   return face;
 }

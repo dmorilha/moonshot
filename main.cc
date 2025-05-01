@@ -45,6 +45,7 @@ void WaylandPoller<F>::pollin() {
 
 struct {
   std::size_t column = 0;
+  std::size_t glyphDescender = 0;
   std::size_t glyphHeight = 0;
   std::size_t glyphWidth = 0;
   std::size_t leftPadding = 10;
@@ -58,14 +59,20 @@ struct {
   constexpr float scaleWidth() { return 2.f / surfaceWidth; }
 } dimensions;
 
-int main() {
+int main(int argc, char ** argv) {
   const float background[3] = { 0.4f, 0.2f, 0.5f, };
   const float color[3] = { 0.8f, 0.4f, 1.f, };
   bool repaint = true;
   std::vector<char> buffer;
 
+  int faceSize =  12;
+  if (1 < argc) {
+    faceSize = std::atoi(argv[1]);
+  }
+
   freetype::Library freetype;
-  const auto face = freetype.load("/usr/share/fonts/liberation-fonts/LiberationMono-Regular.ttf", 12);
+  const auto face = freetype.load("/usr/share/fonts/liberation-fonts/LiberationMono-Regular.ttf", faceSize);
+  dimensions.glyphDescender = face.descender();
   dimensions.glyphHeight = face.lineHeight();
   dimensions.glyphWidth = face.glyphWidth();
 
@@ -192,38 +199,34 @@ int main() {
 
         // const float scale[2] = { 2.f / surface.width(), 2.f / surface.height(), };
 
+#if 0
+        std::cout << c << " " << glyph.top << " " << glyph.height << " " << dimensions.glyphHeight << std::endl;
+#endif
+
         const float vertices[4][4] = {
           // vertex a - top left
           { -1.f + dimensions.scaleWidth() * left,
-            1.f - dimensions.scaleHeight() * (dimensions.glyphHeight - glyph.top + top),
+            1.f - dimensions.scaleHeight() * (dimensions.glyphHeight - glyph.top + top + dimensions.glyphDescender),
             0, 0, },
 
           // vertex b - top right
           { -1.f + dimensions.scaleWidth() * (left + glyph.width),
-            1.f - dimensions.scaleHeight() * (dimensions.glyphHeight - glyph.top + top),
+            1.f - dimensions.scaleHeight() * (dimensions.glyphHeight - glyph.top + top + dimensions.glyphDescender),
             1, 0, },
 
           // vertex c - bottom right
           { -1.f + dimensions.scaleWidth() * (left + glyph.width),
-            1.f - dimensions.scaleHeight() * ((dimensions.glyphHeight - glyph.top) + glyph.height + top),
+            1.f - dimensions.scaleHeight() * ((dimensions.glyphHeight - glyph.top) + glyph.height + top + dimensions.glyphDescender),
             1, 1, },
 
           // vertex d - bottom left
           { -1.f + dimensions.scaleWidth() * left,
-            1.f - dimensions.scaleHeight() * ((dimensions.glyphHeight - glyph.top) + glyph.height + top),0, 1, },
+            1.f - dimensions.scaleHeight() * ((dimensions.glyphHeight - glyph.top) + glyph.height + top + dimensions.glyphDescender),
+            0, 1, },
         }; 
 
         cursor_left = left += face.glyphWidth();
         dimensions.column += 1;
-
-  #if 0
-        for (int i = 0; i < 4; ++i) {
-          for (int j = 0;j < 2; ++j)
-            std::cout << "| " << vertices[i][j] << " ";
-          std::cout << "|" << std::endl;
-        }
-        std::cout << "-------------------------" << std::endl;
-  #endif
 
         glGenBuffers(1, &vertex_buffer);
         glBindBuffer(GL_ARRAY_BUFFER, vertex_buffer);

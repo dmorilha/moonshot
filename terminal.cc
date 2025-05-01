@@ -7,11 +7,13 @@
 #include <pty.h>
 #include <utmp.h>
 
+#include <unistd.h>
+
 #include "terminal.h"
 
 const std::string Terminal::path = "/bin/bash";
 
-Terminal::Terminal() : Events(POLLIN) { }
+Terminal::Terminal() : Events(POLLIN | POLLHUP) { }
 
 void Terminal::pollin() {
   Buffer buffer{'\0'};
@@ -20,6 +22,10 @@ void Terminal::pollin() {
       onRead_(buffer);
     }
   }
+}
+
+void Terminal::pollhup() {
+  exit(0);
 }
 
 int Terminal::childfd() const {
@@ -43,6 +49,7 @@ std::unique_ptr<Terminal> Terminal::New(Terminal::OnRead && onRead) {
     unsetenv("TERMCAP");
     unsetenv("COLORTERM");
     unsetenv("TERM");
+    putenv("TERM=vt100");
     const int returnValue = execvp(Terminal::path.c_str(), nullptr);
     if (0 != returnValue) {
       assert(!"FATAL ERROR");
