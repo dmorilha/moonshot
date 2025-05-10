@@ -44,10 +44,22 @@ EGL & EGL::operator = (EGL && other) {
 }
 
 void EGL::resize(std::size_t height, std::size_t width) {
-  std::cout << __func__ << " " << width << "x" << height << std::endl;
   assert(nullptr != eglWindow_);
+  std::cout << __func__ << " " << width << "x" << height << std::endl;
   return wl_egl_window_resize(eglWindow_, width, height, 0, 0);
 }
+
+Surface::Surface(Surface && other) :
+  egl_(std::move(other.egl_)),
+  surface_(other.surface_),
+  toplevel_(other.toplevel_),
+  height_(other.height_),
+  width_(other.width_) {
+    other.surface_ = nullptr;
+    other.toplevel_ = nullptr;
+    other.height_ = 0;
+    other.width_ = 0;
+  }
 
 void Surface::onToplevelConfigure(struct xdg_toplevel *, const int32_t width, const int32_t height, struct wl_array *) {
   if (height != height_ || width != width_) {
@@ -85,7 +97,7 @@ void Connection::capabilities() {
   assert(nullptr != surface_);
 }
 
-EGL Connection::egl() {
+EGL Connection::egl() const {
   EGL result;
 
   assert(nullptr != display_);
@@ -140,13 +152,13 @@ EGL Connection::egl() {
   return result;
 }
 
-Surface Connection::surface(EGL & egl) {
-  Surface result(egl);
+std::unique_ptr<Surface> Connection::surface(EGL && egl) const {
+  auto result = std::make_unique<Surface>(std::move(egl));
   assert(nullptr != surface_);
-  result.surface_ = xdg_wm_base_get_xdg_surface(wm_base_, surface_);
-  xdg_surface_add_listener(result.surface_, &Surface::xdg_surface_listener, &result);
-  result.toplevel_ = xdg_surface_get_toplevel(result.surface_);
-  xdg_toplevel_add_listener(result.toplevel_, &Surface::toplevel_listener, &result);
+  result->surface_ = xdg_wm_base_get_xdg_surface(wm_base_, surface_);
+  xdg_surface_add_listener(result->surface_, &Surface::xdg_surface_listener, result.get());
+  result->toplevel_ = xdg_surface_get_toplevel(result->surface_);
+  xdg_toplevel_add_listener(result->toplevel_, &Surface::toplevel_listener, result.get());
   wl_surface_commit(surface_);
   assert(nullptr != display_);
   wl_display_roundtrip(display_);

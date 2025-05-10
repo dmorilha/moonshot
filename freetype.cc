@@ -87,6 +87,7 @@ Face Library::load(const std::string & filename, const std::size_t size, const s
     << std::endl;
 #endif
 
+
   return face;
 }
 
@@ -95,6 +96,20 @@ Face::~Face() {
     FT_Done_Face(face_);
     face_ = nullptr;
   }
+}
+
+Face::Face(Face && other) :
+  face_(std::move(other.face_)),
+  descender_(other.descender_),
+  lineHeight_(other.lineHeight_),
+  glyphWidth_(other.glyphWidth_) { }
+
+Face & Face::operator = (Face && other) {
+  std::swap(face_, other.face_);
+  descender_ = other.descender_;
+  lineHeight_ = other.lineHeight_;
+  glyphWidth_ = other.glyphWidth_;
+  return *this;
 }
 
 Glyph Face::glyph(const char codepoint) const {

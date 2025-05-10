@@ -1,6 +1,7 @@
 #pragma once
 
 #include <functional>
+#include <memory>
 #include <string>
 
 #include <wayland-client.h>
@@ -24,7 +25,7 @@
 
 namespace wayland {
 struct EGL {
-  ~EGL();
+  ~EGL(); 
   EGL() = default;
 
   EGL(EGL &&);
@@ -42,15 +43,18 @@ struct EGL {
 };
 
 struct Surface {
-  ~Surface() { }
+  ~Surface() { std::cout << __func__ << " " << this << std::endl; }
+  Surface(EGL && egl) : egl_(std::move(egl)) { }
 
-  Surface(EGL & egl) : egl_(egl) { }
-
-  Surface(Surface &&) = default;
-  Surface & operator = (Surface &&) = default;
+  Surface(const Surface &) = delete;
+  Surface(Surface &&);
+  Surface & operator = (Surface &) = delete;
+  Surface & operator = (Surface &&) = delete;
 
   inline std::size_t height() const { return height_; }
   inline std::size_t width() const { return width_; }
+
+  const EGL & egl() const { return egl_; }
 
 // private:
   constexpr static struct xdg_surface_listener xdg_surface_listener{
@@ -76,7 +80,7 @@ struct Surface {
       struct xdg_toplevel * toplevel) { /* UNIMPLEMENTED */ }},
   };
 
-  EGL & egl_;
+  EGL egl_;
   struct xdg_surface * surface_ = nullptr;
   struct xdg_toplevel * toplevel_ = nullptr;
   std::size_t height_ = 0;
@@ -87,8 +91,8 @@ struct Surface {
 struct Connection {
   ~Connection();
 
-  EGL egl();
-  Surface surface(EGL &);
+  EGL egl() const;
+  std::unique_ptr<Surface> surface(EGL &&) const;
   void capabilities();
   void connect();
   void loop();

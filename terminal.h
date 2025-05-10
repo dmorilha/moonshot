@@ -1,32 +1,31 @@
 #pragma once
 
-#include <array>
 #include <functional>
 #include <memory>
 #include <string>
 
 #include "poller.h"
 
-/* add support to terminal state machine emulation */
-/* each type of terminal inherits from this Basic Terminal */
-struct Terminal : public Events {
-  using Buffer = std::array<char, 1025>;
-  using OnRead = std::function<void (const Buffer &)>;
+struct Screen;
 
-  static std::unique_ptr<Terminal> New(OnRead &&);
+/* add support to terminal state machine emulation */
+struct Terminal : public Events {
+#if 0
+  using OnRead = std::function<void (const Buffer &)>;
+#endif
+
+  static std::unique_ptr<Terminal> New(Screen * const);
 
   int childfd() const;
   void pollhup() override;
   void pollin() override;
-  void write(const Buffer &);
+  // void write(const Buffer &);
   void write(const char * const, const std::size_t);
 
-private:
+protected:
+  Terminal(Screen * const);
   const static std::string path;
-
-  Terminal();
-
-  OnRead onRead_;
+  Screen * const screen_ = nullptr;
   struct {
     int child = 0;
     int parent = 0;

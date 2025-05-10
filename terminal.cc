@@ -1,5 +1,7 @@
 #include <algorithm>
+#include <array>
 #include <iostream>
+#include <vector>
 
 #include <cassert>
 
@@ -9,19 +11,27 @@
 
 #include <unistd.h>
 
+#include "char.h"
+#include "screen.h"
 #include "terminal.h"
+#include "vt100.h"
 
 const std::string Terminal::path = "/bin/bash";
 
-Terminal::Terminal() : Events(POLLIN | POLLHUP) { }
+Terminal::Terminal(Screen * const screen) : Events(POLLIN | POLLHUP), screen_(screen) { }
 
 void Terminal::pollin() {
-  Buffer buffer{'\0'};
-  while (0 < read(fd_.child, buffer.data(), buffer.size() - 1)) {
-    if (static_cast<bool>(onRead_)) {
-      onRead_(buffer);
+  Screen::Buffer output;
+  std::array<char, 1025> buffer{'\0'};
+  assert(nullptr != screen_);
+  ssize_t length = read(fd_.child, buffer.data(), buffer.size() - 1);
+  while (0 < length) {
+    for (std::size_t i = 0; i < length; ++i) {
+      output.push_back(Char{ .character = buffer[i], });
     }
+    length = read(fd_.child, buffer.data(), buffer.size() - 1);
   }
+  screen_->write(output);
 }
 
 void Terminal::pollhup() {
@@ -32,10 +42,18 @@ int Terminal::childfd() const {
   return fd_.child;
 }
 
-std::unique_ptr<Terminal> Terminal::New(Terminal::OnRead && onRead) {
-  std::unique_ptr<Terminal> instance{new Terminal};
+std::unique_ptr<Terminal> Terminal::New(Screen * const screen) {
+  std::unique_ptr<Terminal> instance = nullptr; //{new Terminal};
+  assert(nullptr != screen);
 
-  instance->onRead_ = std::move(onRead);
+  const std::string terminalType = getenv("TERM");
+
+  if ("vt100" == terminalType) {
+    instance = std::unique_ptr<Terminal>(new vt100(screen));
+  } else {
+    unsetenv("TERM");
+    instance = std::unique_ptr<Terminal>(new Terminal(screen));
+  }
 
   const struct winsize winsize{ .ws_row = 38, .ws_col = 136, };
 
@@ -48,8 +66,6 @@ std::unique_ptr<Terminal> Terminal::New(Terminal::OnRead && onRead) {
     unsetenv("LINES");
     unsetenv("TERMCAP");
     unsetenv("COLORTERM");
-    unsetenv("TERM");
-    putenv("TERM=vt100");
     const int returnValue = execvp(Terminal::path.c_str(), nullptr);
     if (0 != returnValue) {
       assert(!"FATAL ERROR");
@@ -68,8 +84,10 @@ void Terminal::write(const char * const key, std::size_t length) {
   assert(0 <= result);
 }
 
+#if 0
 void Terminal::write(const Terminal::Buffer & buffer) {
   assert(0 < fd_.child);
   const ssize_t result = ::write(fd_.child, buffer.data(), std::find(buffer.begin(), buffer.end(), '\0') - buffer.begin());
   assert(0 <= result);
 }
+#endif

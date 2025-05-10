@@ -22,14 +22,9 @@ struct Face {
 
   Face() = default;
   Face(const Face &) = delete;
-  Face(Face && other) {
-    std::swap(face_, other.face_);
-  }
+  Face(Face && other);
   Face & operator = (const Face &) = delete;
-  Face & operator = (Face && other) {
-    std::swap(face_, other.face_);
-    return *this;
-  }
+  Face & operator = (Face && other);
 
   std::size_t descender() const {
     return descender_;
@@ -47,7 +42,7 @@ struct Face {
 
 // private:
   FT_Face face_ = nullptr;
-  std::size_t descender_ = 0;
+  long descender_ = 0;
   std::size_t lineHeight_ = 0;
   std::size_t glyphWidth_ = 0;
 };
