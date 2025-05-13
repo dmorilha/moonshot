@@ -3,12 +3,14 @@
 #include <iostream>
 #include <vector>
 
-#include "char.h"
+#include "buffer.h"
 #include "freetype.h"
 #include "wayland.h"
 
 struct Dimensions {
   std::size_t column = 0;
+  std::size_t cursor_left = 10;
+  std::size_t cursor_top = 10;
   std::size_t glyphDescender = 0;
   std::size_t glyphHeight = 0;
   std::size_t glyphWidth = 0;
@@ -17,10 +19,10 @@ struct Dimensions {
   std::size_t surfaceHeight = 0;
   std::size_t surfaceWidth = 0;
   std::size_t topPadding = 10;
-  constexpr std::size_t columns() { return std::floor(surfaceWidth / glyphWidth); }
-  constexpr std::size_t rows() { return std::floor(surfaceHeight / glyphHeight); }
-  constexpr float scaleHeight() { return 2.f / surfaceHeight; }
-  constexpr float scaleWidth() { return 2.f / surfaceWidth; }
+  constexpr std::size_t columns() const { return std::floor(surfaceWidth / glyphWidth); }
+  constexpr std::size_t rows() const { return std::floor(surfaceHeight / glyphHeight); }
+  constexpr float scaleHeight() const { return 2.f / surfaceHeight; }
+  constexpr float scaleWidth() const { return 2.f / surfaceWidth; }
 
   friend std::ostream & operator << (std::ostream &, const Dimensions &);
 
@@ -28,8 +30,6 @@ struct Dimensions {
 };
 
 struct Screen {
-  using Buffer = std::vector<Char>;
-
   Screen() = delete;
 
   Screen(const Screen &) = delete;
@@ -45,12 +45,13 @@ struct Screen {
 
   static Screen New(const wayland::Connection &);
 
-  void write(const Buffer &);
+  Buffer & buffer() { return buffer_; }
   void clear();
   void makeCurrent() const;
   void paint();
   void repaint();
-  bool swapBuffers() const;
+  bool swapGLBuffers() const;
+  void write();
 
 private:
   Screen(std::unique_ptr<wayland::Surface> && surface) : surface_(std::move(surface)) { }
@@ -64,18 +65,16 @@ private:
 
   GLuint glProgram_ = 0;
 
-  std::size_t cursor_left_ = 10;
-  std::size_t cursor_top_ = 10;
-
-  std::vector<Char> buffer_;
+  Buffer buffer_;
   bool repaint_ = false;
+  bool wrap_ = false;
 
   Dimensions dimensions_;
 
   struct {
-    GLint background = 0 /* = glGetUniformLocation(program, "background") */ ;
-    GLint color = 0 /* = glGetUniformLocation(program, "color") */ ;
-    GLint texture = 0 /* = glGetUniformLocation(program, "texture") */ ;
-    GLint vpos = 0 /* = glGetAttribLocation(program, "vPos") */ ;
+    GLint background = 0;
+    GLint color = 0;
+    GLint texture = 0;
+    GLint vpos = 0;
   } location_;
 };

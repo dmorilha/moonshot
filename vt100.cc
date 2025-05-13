@@ -3,16 +3,13 @@
 
 #include <cassert>
 
-#include "char.h"
+#include "buffer.h"
 #include "screen.h"
 #include "vt100.h"
-
-using Buffer = std::vector<Char>;
 
 vt100::vt100(Screen * const screen) : Terminal(screen) { }
 
 void vt100::pollin() {
-  Screen::Buffer output;
   std::array<char, 1025> buffer{'\0'};
   assert(nullptr != screen_);
   ssize_t length = read(fd_.child, buffer.data(), buffer.size() - 1);
@@ -52,7 +49,7 @@ void vt100::pollin() {
           state_ = ESCAPE;
           break;
         default:
-          output.push_back(Char{ .character = buffer[i], });
+          screen_->buffer().push_back(Char{ .character = buffer[i], });
           break;
         }
       }
@@ -60,5 +57,5 @@ void vt100::pollin() {
     std::cout << std::endl;
     length = read(fd_.child, buffer.data(), buffer.size() - 1);
   }
-  screen_->write(output);
+  screen_->write();
 }

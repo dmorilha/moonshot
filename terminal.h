@@ -10,16 +10,11 @@ struct Screen;
 
 /* add support to terminal state machine emulation */
 struct Terminal : public Events {
-#if 0
-  using OnRead = std::function<void (const Buffer &)>;
-#endif
-
   static std::unique_ptr<Terminal> New(Screen * const);
 
   int childfd() const;
   void pollhup() override;
   void pollin() override;
-  // void write(const Buffer &);
   void write(const char * const, const std::size_t);
 
 protected:

@@ -32,7 +32,7 @@ int main(int argc, char ** argv) {
   connection.capabilities();
   Screen screen{Screen::New(connection)};
 
-  int faceSize =  12;
+  int faceSize =  8;
   if (1 < argc) {
     faceSize = std::atoi(argv[1]);
   }

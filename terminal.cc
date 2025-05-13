@@ -11,7 +11,7 @@
 
 #include <unistd.h>
 
-#include "char.h"
+#include "buffer.h"
 #include "screen.h"
 #include "terminal.h"
 #include "vt100.h"
@@ -21,17 +21,16 @@ const std::string Terminal::path = "/bin/bash";
 Terminal::Terminal(Screen * const screen) : Events(POLLIN | POLLHUP), screen_(screen) { }
 
 void Terminal::pollin() {
-  Screen::Buffer output;
   std::array<char, 1025> buffer{'\0'};
   assert(nullptr != screen_);
   ssize_t length = read(fd_.child, buffer.data(), buffer.size() - 1);
   while (0 < length) {
     for (std::size_t i = 0; i < length; ++i) {
-      output.push_back(Char{ .character = buffer[i], });
+      screen_->buffer().push_back(Char{ .character = buffer[i], });
     }
     length = read(fd_.child, buffer.data(), buffer.size() - 1);
   }
-  screen_->write(output);
+  screen_->write();
 }
 
 void Terminal::pollhup() {
@@ -83,11 +82,3 @@ void Terminal::write(const char * const key, std::size_t length) {
   const ssize_t result = ::write(fd_.child, key, length);
   assert(0 <= result);
 }
-
-#if 0
-void Terminal::write(const Terminal::Buffer & buffer) {
-  assert(0 < fd_.child);
-  const ssize_t result = ::write(fd_.child, buffer.data(), std::find(buffer.begin(), buffer.end(), '\0') - buffer.begin());
-  assert(0 <= result);
-}
-#endif
