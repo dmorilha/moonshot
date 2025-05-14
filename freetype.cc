@@ -58,6 +58,7 @@ Face Library::load(const std::string & filename, const std::size_t size, const s
     }
   }
 
+  face.ascender_ = face.face_->size->metrics.ascender / 64;
   face.descender_ = face.face_->size->metrics.descender / 64;
   face.glyphWidth_ = face.face_->glyph->advance.x / 64;
   face.lineHeight_ = face.face_->size->metrics.height / 64;
@@ -87,7 +88,6 @@ Face Library::load(const std::string & filename, const std::size_t size, const s
     << std::endl;
 #endif
 
-
   return face;
 }
 
@@ -100,12 +100,14 @@ Face::~Face() {
 
 Face::Face(Face && other) :
   face_(std::move(other.face_)),
+  ascender_(other.ascender_),
   descender_(other.descender_),
   lineHeight_(other.lineHeight_),
   glyphWidth_(other.glyphWidth_) { }
 
 Face & Face::operator = (Face && other) {
   std::swap(face_, other.face_);
+  ascender_ = other.ascender_;
   descender_ = other.descender_;
   lineHeight_ = other.lineHeight_;
   glyphWidth_ = other.glyphWidth_;

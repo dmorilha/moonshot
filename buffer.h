@@ -6,31 +6,21 @@
 
 #include "char.h"
 
-// create iterators
 struct Buffer {
-  struct Iterator {
-    Iterator() = default;
-    Iterator(Buffer * b) : buffer_(b) { }
-    bool operator == (const Iterator & other) const { return buffer_ == other.buffer_ && column_ == other.column_ && row_ == other.row_; }
-    Iterator & operator ++ ();
-    Char & operator * () const;
-  private:
-    Buffer * buffer_ = nullptr;
-    std::size_t column_ = 0;
-    std::size_t row_ = 0;
-  };
-
-  using Row = std::vector<Char>;
+  // not the most efficient storage
+  using Row = std::vector< Char >;
+  using Rows = std::vector< Row >;
 
   Buffer();
 
-  Iterator begin() { return Iterator(this); }
-  Iterator end() { return Iterator(); }
+  Rows::const_reverse_iterator begin() const { return rows_.rbegin(); }
+  Rows::const_reverse_iterator end() const { return rows_.rend(); }
+  std::size_t rows() const { return rows_.size(); }
   void clear();
   void push_back(const Char &);
   void set_columns(std::size_t c) { columns_ = c; }
 
 private:
   std::size_t columns_ = 0;
-  std::vector< Row > buffer_;
+  Rows rows_;
 };

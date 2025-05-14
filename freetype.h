@@ -26,6 +26,10 @@ struct Face {
   Face & operator = (const Face &) = delete;
   Face & operator = (Face && other);
 
+  std::size_t ascender() const {
+    return ascender_;
+  }
+
   std::size_t descender() const {
     return descender_;
   }
@@ -42,6 +46,7 @@ struct Face {
 
 // private:
   FT_Face face_ = nullptr;
+  long ascender_ = 0;
   long descender_ = 0;
   std::size_t lineHeight_ = 0;
   std::size_t glyphWidth_ = 0;

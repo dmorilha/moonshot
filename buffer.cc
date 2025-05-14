@@ -3,28 +3,28 @@
 #include "buffer.h"
 
 Buffer::Buffer() {
-  buffer_.emplace_back(Row{});
+  rows_.emplace_back(Row{});
 }
 
 void Buffer::clear() {
-  for (Row & row : buffer_) {
+  for (Row & row : rows_) {
     row.clear();
   }
-  buffer_.clear();
+  rows_.clear();
 }
 
 void Buffer::push_back(const Char & c) {
   bool newLine = false;
   switch (c.character) {
-    case '\a': // NEW LINE
+    case '\a': // BELL
       // what should we do?
       return;
       break;
 
-    case '\b': // NEW LINE
+    case '\b': // BACKSPACE
       {
-        if ( ! buffer_.back().empty()) {
-          buffer_.back().erase(buffer_.back().end());
+        if ( ! rows_.back().empty()) {
+          rows_.back().erase(rows_.back().end());
         }
         return;
       }
@@ -38,37 +38,16 @@ void Buffer::push_back(const Char & c) {
       break;
   }
 
+  #if 0
   assert(0 < columns_);
-  if (columns_ <= buffer_.back().size()) {
+  if (columns_ <= rows_.back().size()) {
     newLine = true;
   }
+  #endif
 
-  buffer_.back().push_back(c);
+  rows_.back().push_back(c);
 
   if (newLine) {
-    buffer_.emplace_back(Row{});
+    rows_.emplace_back(Row{});
   }
-}
-
-Char & Buffer::Iterator::operator * () const {
-  assert(nullptr != buffer_);
-  assert(buffer_->buffer_.size() > row_);
-  assert(buffer_->buffer_[row_].size() > column_);
-  return buffer_->buffer_[row_][column_];
-}
-
-Buffer::Iterator & Buffer::Iterator::operator ++ () {
-  ++column_;
-  if (nullptr != buffer_) {
-    if (buffer_->buffer_[row_].size() == column_) {
-      column_ = 0;
-      ++row_;
-    }
-  }
-  if (buffer_->buffer_.size() <= row_) {
-    buffer_ = nullptr;
-    column_ = 0;
-    row_ = 0;
-  }
-  return *this;
 }
