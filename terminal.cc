@@ -1,5 +1,6 @@
 #include <algorithm>
 #include <array>
+#include <functional>
 #include <iostream>
 #include <vector>
 
@@ -45,7 +46,14 @@ std::unique_ptr<Terminal> Terminal::New(Screen * const screen) {
   std::unique_ptr<Terminal> instance = nullptr; //{new Terminal};
   assert(nullptr != screen);
 
-  const std::string terminalType = getenv("TERM");
+  const char * const TERM = getenv("TERM");
+  std::string terminalType;
+  if (nullptr != TERM && 0 < strlen(TERM)) {
+    terminalType = getenv("TERM");
+  }
+
+  std::transform(terminalType.begin(), terminalType.end(), terminalType.begin(),
+    std::bind(std::tolower<std::string::value_type>, std::placeholders::_1, std::locale::classic()));
 
   if ("vt100" == terminalType) {
     instance = std::unique_ptr<Terminal>(new vt100(screen));
@@ -61,10 +69,12 @@ std::unique_ptr<Terminal> Terminal::New(Screen * const screen) {
   if (0 == instance->pid_) { /* CHILD */
     close(instance->fd_.child);
     login_tty(instance->fd_.parent);
+    putenv(instance->columns);
+    putenv(instance->lines);
+    unsetenv("COLORTERM");
     unsetenv("COLUMNS");
     unsetenv("LINES");
     unsetenv("TERMCAP");
-    unsetenv("COLORTERM");
     const int returnValue = execvp(Terminal::path.c_str(), nullptr);
     if (0 != returnValue) {
       assert(!"FATAL ERROR");
@@ -81,4 +91,14 @@ void Terminal::write(const char * const key, std::size_t length) {
   assert(0 < fd_.child);
   const ssize_t result = ::write(fd_.child, key, length);
   assert(0 <= result);
+}
+
+void Terminal::resize(int32_t width, int32_t height) {
+  std::cout << __func__ << std::endl;
+  assert(nullptr != screen_);
+  const std::string c = std::to_string(screen_->getColumns());
+  std::copy(c.begin(), c.end(), columns + 8);
+  const std::string l = std::to_string(screen_->getRows());
+  std::copy(l.begin(), l.end(), lines + 6);
+  std::cout << __func__ << " " << columns << ", " << lines << std::endl;
 }

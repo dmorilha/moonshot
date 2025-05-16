@@ -42,8 +42,10 @@ struct EGL {
   struct wl_egl_window * eglWindow_ = nullptr;
 };
 
+struct Surface;
+
 struct Surface {
-  ~Surface() { std::cout << __func__ << " " << this << std::endl; }
+  ~Surface() = default;
   Surface(EGL && egl) : egl_(std::move(egl)) { }
 
   Surface(const Surface &) = delete;
@@ -57,28 +59,8 @@ struct Surface {
   const EGL & egl() const { return egl_; }
 
 // private:
-  constexpr static struct xdg_surface_listener xdg_surface_listener{
-    .configure{[](void * data,
-      struct xdg_surface * surface,
-      uint32_t serial) { xdg_surface_ack_configure(surface, serial); }},
-  };
-
   void onToplevelConfigure(struct xdg_toplevel *, const int32_t, const int32_t, struct wl_array *);
-
-  constexpr static struct xdg_toplevel_listener toplevel_listener{
-    .configure{[](void * data,
-      struct xdg_toplevel * toplevel,
-      int32_t width,
-      int32_t height,
-      struct wl_array * states) {
-        Surface * const surface = static_cast<Surface *>(data);
-        assert(nullptr != surface);
-        surface->onToplevelConfigure(toplevel, width, height, states);
-      }},
-
-    .close{[](void * data,
-      struct xdg_toplevel * toplevel) { /* UNIMPLEMENTED */ }},
-  };
+  std::function<void (int32_t, int32_t)> onResize;
 
   EGL egl_;
   struct xdg_surface * surface_ = nullptr;
@@ -125,157 +107,10 @@ struct Connection {
       uint32_t key,
       uint32_t state);
 
-  constexpr static struct wl_seat_listener seat_listener{
-    .capabilities{[](void * data,
-      struct wl_seat * seat,
-      uint32_t capabilities) {
-        Connection * const connection = static_cast<Connection *>(data);
-        assert(nullptr != connection);
-        connection->seatCapabilities(seat, capabilities);
-      }},
-
-    .name{[](void *, struct wl_seat *, const char *){ /* UNIMPLEMENTED */ }},
-  };
-
-  constexpr static struct wl_registry_listener registry_listener{
-    .global{[](void * const data,
-      struct wl_registry * wl_registry,
-      uint32_t name,
-      const char * interface,
-      uint32_t version) {
-        Connection * const connection = static_cast<Connection *>(data);
-        assert(nullptr != connection);
-        connection->registryGlobal(wl_registry, name, interface, version);
-      }},
-  };
-
-  constexpr static struct wl_output_listener output_listener{
-    .geometry{[](void * data,
-      struct wl_output * output,
-      int32_t x,
-      int32_t y,
-      int32_t physical_width,
-      int32_t physical_height,
-      int32_t subpixel,
-      const char * make,
-      const char * model,
-      int32_t transform) { /* UNIMPLEMENTED */ }},
-
-    .mode{[](void * data,
-      struct wl_output * output,
-      uint32_t flags,
-      int32_t width,
-      int32_t height,
-      int32_t refresh) {
-        Connection * const connection = static_cast<Connection *>(data);
-        assert(nullptr != connection);
-        connection->outputMode(output, flags, width, height, refresh);
-      }},
-
-    .done{[](void * data,
-      struct wl_output * output) { /* UNIMPLEMENTED */ }},
-
-    .scale{[](void * data,
-      struct wl_output * output,
-      int32_t factor) { /* UNIMPLEMENTED */ }},
-  };
-
-  constexpr static struct wl_pointer_listener pointer_listener{
-    .enter{[](void * data,
-      struct wl_pointer * pointer,
-      uint32_t serial,
-      struct wl_surface * surface,
-      wl_fixed_t x,
-      wl_fixed_t y) { /* UNIMPLEMENTED */ }},
-
-    .leave{[](void * data,
-      struct wl_pointer * pointer,
-      uint32_t serial,
-      struct wl_surface * surface) { /* UNIMPLEMENTED */ }},
-
-    .motion{[](void * data,
-      struct wl_pointer * pointer,
-      uint32_t serial,
-      wl_fixed_t x,
-      wl_fixed_t y) { /* UNIMPLEMENTED */ }},
-
-    .button{[](void * data,
-      struct wl_pointer * pointer,
-      uint32_t serial,
-      uint32_t time,
-      uint32_t button,
-      uint32_t state) { /* UNIMPLEMENTED */ }},
-
-    .axis{[](void * data,
-      struct wl_pointer * pointer,
+  void pointerAxis(struct wl_pointer * pointer,
       uint32_t time,
       uint32_t axis,
-      wl_fixed_t value) { /* UNIMPLEMENTED */ }},
-
-    .frame{[](void * data,
-        struct wl_pointer * pointer) { /* UNIMPLEMENTED */ }},
-      
-    .axis_source{[](void * data,
-        struct wl_pointer * pointer,
-        uint32_t axis) { /* UNIMPLEMENTED */  }},
-
-    .axis_stop{[](void * data,
-        struct wl_pointer * pointer,
-        uint32_t time,
-        uint32_t axis) { /* UNIMPLEMENTED */ }},
-
-    .axis_discrete{[](void * data,
-        struct wl_pointer * pointer,
-        uint32_t axis,
-        int32_t discrete) { /* UNIMPLEMENTED */ }},
-  };
-
-  constexpr static struct wl_keyboard_listener keyboard_listener{
-    .keymap{[](void * data,
-      struct wl_keyboard * keyboard,
-      uint32_t format,
-      int fd,
-      uint32_t size) {
-        Connection * const connection = static_cast<Connection *>(data);
-        assert(nullptr != connection);
-        connection->keyboardKeymap(keyboard, format, fd, size);
-      }},
-
-    .enter{[](void * data,
-      struct wl_keyboard * keyboard,
-      uint32_t serial,
-      struct wl_surface * surface,
-      struct wl_array * keys) { /* UNIMPLEMENTED */ }},
-
-    .leave{[](void * data,
-      struct wl_keyboard * keyboard,
-      uint32_t serial,
-      struct wl_surface * surface) { /* UNIMPLEMENTED */ }},
-
-    .key{[](void * data,
-      struct wl_keyboard * keyboard,
-      uint32_t serial,
-      uint32_t time,
-      uint32_t key,
-      uint32_t state) {
-        Connection * const connection = static_cast<Connection *>(data);
-        assert(nullptr != connection);
-        connection->keyboardKey(keyboard, serial, time, key, state);
-      }},
-
-    .modifiers{[](void * data,
-      struct wl_keyboard * keyboard,
-      uint32_t serial,
-      uint32_t mods_depressed,
-      uint32_t mods_latched,
-      uint32_t mods_locked,
-      uint32_t group) { /* UNIMPLEMENTED */ }},
-
-    .repeat_info{[](void * data,
-      struct wl_keyboard * keyboard,
-      int32_t rate,
-      int32_t delay) { /* UNIMPLEMENTED */ }},
-  };
+      int32_t value);
 
   struct wl_compositor * compositor_ = nullptr;
   struct wl_display * display_ = nullptr;
@@ -308,6 +143,7 @@ struct Connection {
   bool running_ = false;
 
   std::function<void (const char *)> onKeyPress;
+  std::function<void (uint32_t, int32_t)> onPointerAxisChange;
 
   friend class EGL;
   friend class Surface;

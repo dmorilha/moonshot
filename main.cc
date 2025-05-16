@@ -25,8 +25,6 @@ void WaylandPoller<F>::pollin() {
 }
 
 int main(int argc, char ** argv) {
-  bool repaint = true;
-
   wayland::Connection connection;
   connection.connect();
   connection.capabilities();
@@ -39,24 +37,10 @@ int main(int argc, char ** argv) {
 
   screen.loadFace("/usr/share/fonts/liberation-fonts/LiberationMono-Regular.ttf", faceSize);
 
-  // opengl rendering
-#if 0
-  screen.makeCurrent();
-  screen.swapBuffers();
-#endif
-
   connection.roundtrip();
 
   Poller poller;
 
-  #if 0
-  auto t = Terminal::New(/* on read */[&](const Terminal::Buffer & b){
-      std::copy(b.begin(),
-          std::find(b.begin(), b.end(), '\0'),
-          std::back_inserter(buffer));
-      repaint = true;
-      });
-  #endif
   auto t = Terminal::New(&screen);
   const int fd = t->childfd();
   Terminal & terminal = poller.add(fd, std::move(t));
@@ -67,6 +51,21 @@ int main(int argc, char ** argv) {
 
   connection.onKeyPress = [&](const char * const key) {
     terminal.write(key, strlen(key));
+  };
+
+  connection.onPointerAxisChange = [&](uint32_t axis, int32_t value) {
+    switch (axis) {
+    case 0:
+      screen.changeScrollY(value);
+      break;
+    case 1:
+      screen.changeScrollX(value);
+      break;
+    }
+  };
+
+  screen.onResize = [&](int32_t width, int32_t height) {
+    terminal.resize(width, height);
   };
 
   poller.on();

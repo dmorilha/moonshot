@@ -17,6 +17,8 @@ struct Dimensions {
   std::size_t glyphWidth = 0;
   std::size_t leftPadding = 10;
   std::size_t row = 0;
+  int32_t scrollX = 0;
+  int32_t scrollY = 0;
   std::size_t surfaceHeight = 0;
   std::size_t surfaceWidth = 0;
   std::size_t topPadding = 10;
@@ -48,14 +50,31 @@ struct Screen {
 
   Buffer & buffer() { return buffer_; }
   void clear();
+
+  // scrolling like this seems inefficient
+  void changeScrollY(int32_t value) {
+    dimensions_.scrollY += value * 2;
+    repaint_ = true;
+  }
+
+  void changeScrollX(int32_t value) {
+    dimensions_.scrollX += value * 2;
+    repaint_ = true;
+  }
+
+  int32_t getColumns() const { return dimensions_.columns(); }
+  int32_t getRows() const { return dimensions_.rows(); }
   void makeCurrent() const;
   void paint();
   void repaint();
   bool swapGLBuffers() const;
-  void write();
+  void resize(int32_t, int32_t);
+  void write() { repaint_ = true; }
+
+  std::function<void (int32_t, int32_t)> onResize;
 
 private:
-  Screen(std::unique_ptr<wayland::Surface> && surface) : surface_(std::move(surface)) { }
+  Screen(std::unique_ptr<wayland::Surface> &&);
 
   void dimensions();
 
