@@ -12,8 +12,8 @@ namespace freetype {
 struct Glyph {
   FT_GlyphSlotRec * slot = nullptr;
   uint16_t height = 0;
-  uint16_t left = 0;
-  uint16_t top = 0;
+  int16_t left = 0;
+  int16_t top = 0;
   uint16_t width = 0;
   void * pixels = nullptr;
 };
