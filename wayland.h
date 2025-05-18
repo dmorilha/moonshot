@@ -53,8 +53,9 @@ struct Surface {
   Surface & operator = (Surface &) = delete;
   Surface & operator = (Surface &&) = delete;
 
-  inline std::size_t height() const { return height_; }
-  inline std::size_t width() const { return width_; }
+  uint16_t height() const { return height_; }
+  uint16_t width() const { return width_; }
+  void setTitle(const std::string &);
 
   const EGL & egl() const { return egl_; }
 

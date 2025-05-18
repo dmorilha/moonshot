@@ -8,22 +8,22 @@
 #include "wayland.h"
 
 struct Dimensions {
-  std::size_t column = 0;
-  std::size_t cursor_left = 10;
-  std::size_t cursor_top = 10;
-  std::size_t glyphAscender = 0;
+  uint16_t column = 0;
+  uint16_t cursor_left = 10;
+  uint16_t cursor_top = 10;
+  uint16_t glyphAscender = 0;
   int16_t glyphDescender = 0;
-  std::size_t glyphHeight = 0;
-  std::size_t glyphWidth = 0;
-  std::size_t leftPadding = 10;
-  std::size_t line = 0;
+  uint16_t glyphHeight = 0;
+  uint16_t glyphWidth = 0;
+  uint16_t leftPadding = 10;
+  uint16_t line = 0;
   int16_t scrollX = 0;
   int16_t scrollY = 0;
-  std::size_t surfaceHeight = 0;
-  std::size_t surfaceWidth = 0;
-  std::size_t topPadding = 10;
+  uint16_t surfaceHeight = 0;
+  uint16_t surfaceWidth = 0;
+  uint16_t bottomPadding = 10;
   constexpr uint16_t columns() const { return std::floor((surfaceWidth - leftPadding * 2) / glyphWidth); }
-  constexpr uint16_t lines() const { return std::floor((surfaceHeight - topPadding * 2) / glyphHeight); }
+  constexpr uint16_t lines() const { return std::floor((surfaceHeight - bottomPadding * 2) / glyphHeight); }
   constexpr float scaleHeight() const { return 2.f / surfaceHeight; }
   constexpr float scaleWidth() const { return 2.f / surfaceWidth; }
 

@@ -240,6 +240,11 @@ Surface::Surface(Surface && other) :
     other.width_ = 0;
   }
 
+void Surface::setTitle(const std::string & title) {
+  assert(nullptr != toplevel_);
+  xdg_toplevel_set_title(toplevel_, title.c_str());
+}
+
 void Surface::onToplevelConfigure(struct xdg_toplevel *, const int32_t width, const int32_t height, struct wl_array *) {
   if (height != height_ || width != width_) {
     height_ = std::max(height, 0);

@@ -31,7 +31,9 @@ static GLuint fragment_shader = 0;
 // C++ question ? at some point this may throw 
 Screen Screen::New(const wayland::Connection & connection) {
   auto egl = connection.egl();
-  auto surface = connection.surface(std::move(egl));
+  std::unique_ptr<wayland::Surface> surface = connection.surface(std::move(egl));
+
+  surface->setTitle("Terminal");
 
   Screen result(std::move(surface));
 
@@ -107,7 +109,7 @@ void Screen::paint() {
   glClear(GL_COLOR_BUFFER_BIT);
 
   int16_t left = dimensions_.leftPadding + dimensions_.scrollX;
-  int16_t bottom = dimensions_.topPadding + dimensions_.scrollY + face_.lineHeight() * std::max(static_cast<int>(dimensions_.lines() - buffer_.lines()), 0);
+  int16_t bottom = dimensions_.bottomPadding + dimensions_.scrollY + face_.lineHeight() * std::max(static_cast<int>(dimensions_.lines() - buffer_.lines()), 0);
   dimensions_.column = 0;
   dimensions_.line = 0;
 
@@ -190,16 +192,16 @@ void Screen::paint() {
       const float vertex_top = -1.f + dimensions_.scaleHeight() * (bottom + glyph.top - dimensions_.glyphDescender);
 
       const float vertices[4][4] = {
-        // vertex a - top left
+        // vertex a - left top
         { vertex_left, vertex_top, 0, 0, },
 
-        // vertex b - top right
+        // vertex b - right top
         { vertex_right, vertex_top, 1, 0, },
 
-        // vertex c - bottom right
+        // vertex c - right bottom
         { vertex_right, vertex_bottom, 1, 1, },
 
-        // vertex d - bottom left
+        // vertex d - left bottom
         { vertex_left, vertex_bottom, 0, 1, },
       }; 
 
@@ -261,6 +263,7 @@ nextLine:
   }
 
   #if 0
+  // cursor
   glEnable(GL_SCISSOR_TEST);
   glScissor(dimensions_.cursor_left, surface_->height() - dimensions_.cursor_top - face_.lineHeight(), face_.glyphWidth(), face_.lineHeight());
   glClearColor(background[0], background[1], background[2], 1);
@@ -303,6 +306,6 @@ std::ostream & operator << (std::ostream & o, const Dimensions & d) {
     << ", scaleWidth " << d.scaleWidth()
     << ", surfaceHeight " << d.surfaceHeight
     << ", surfaceWidth " << d.surfaceWidth
-    << ", topPadding " << d.topPadding;
+    << ", bottomPadding " << d.bottomPadding;
   return o;
 }
