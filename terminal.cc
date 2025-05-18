@@ -43,7 +43,7 @@ int Terminal::childfd() const {
 }
 
 std::unique_ptr<Terminal> Terminal::New(Screen * const screen) {
-  std::unique_ptr<Terminal> instance = nullptr; //{new Terminal};
+  std::unique_ptr<Terminal> instance = nullptr;
   assert(nullptr != screen);
 
   const char * const TERM = getenv("TERM");
@@ -94,11 +94,7 @@ void Terminal::resize(int32_t width, int32_t height) {
   assert(nullptr != screen_);
   winsize_.ws_col = screen_->getColumns();
   winsize_.ws_row = screen_->getLines();
-  #if 0
-  winsize_.ws_xpixel = 1;
-  winsize_.ws_ypixel = 1;
-  #endif
   assert(0 < fd_.child);
   const int result = ioctl(fd_.child, TIOCSWINSZ, &winsize_);
-  assert(0 <= result);
+  assert(0 == result);
 }

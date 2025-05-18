@@ -2,6 +2,8 @@
 
 #include <string>
 
+#include <cstdint>
+
 #include <freetype/freetype.h>
 #include <freetype/ftlcdfil.h>
 
@@ -9,10 +11,10 @@ namespace freetype {
 
 struct Glyph {
   FT_GlyphSlotRec * slot = nullptr;
-  std::size_t height = 0;
-  std::size_t left = 0;
-  std::size_t top = 0;
-  std::size_t width = 0;
+  uint16_t height = 0;
+  uint16_t left = 0;
+  uint16_t top = 0;
+  uint16_t width = 0;
   void * pixels = nullptr;
 };
 
@@ -26,19 +28,19 @@ struct Face {
   Face & operator = (const Face &) = delete;
   Face & operator = (Face && other);
 
-  std::size_t ascender() const {
+  uint16_t ascender() const {
     return ascender_;
   }
 
-  std::size_t descender() const {
+  int16_t descender() const {
     return descender_;
   }
 
-  std::size_t glyphWidth() const {
+  uint16_t glyphWidth() const {
     return glyphWidth_;
   }
 
-  std::size_t lineHeight() const {
+  uint16_t lineHeight() const {
     return lineHeight_;
   }
 
@@ -46,10 +48,10 @@ struct Face {
 
 // private:
   FT_Face face_ = nullptr;
-  long ascender_ = 0;
-  long descender_ = 0;
-  std::size_t lineHeight_ = 0;
-  std::size_t glyphWidth_ = 0;
+  uint16_t ascender_ = 0;
+  int16_t descender_ = 0;
+  uint16_t lineHeight_ = 0;
+  uint16_t glyphWidth_ = 0;
 };
 
 //TODO: this is most likely a singleton
@@ -57,7 +59,7 @@ struct Library {
   ~Library();
   Library();
 
-  Face load(const std::string & filename, const std::size_t size = 12, const std::size_t dpi = 150);
+  Face load(const std::string & filename, const uint16_t size = 12, const uint16_t dpi = 150);
 
 private:
   FT_Library library_ = nullptr;

@@ -29,7 +29,7 @@ Library::Library() {
   }
 }
 
-Face Library::load(const std::string & filename, const std::size_t size, const std::size_t dpi) {
+Face Library::load(const std::string & filename, const uint16_t size, const uint16_t dpi) {
   assert(nullptr != library_);
   Face face;
 

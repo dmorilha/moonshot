@@ -84,7 +84,7 @@ void Screen::makeCurrent() const {
 }
 
 bool Screen::swapGLBuffers() const {
-  static std::size_t it = 0;
+  static uint16_t it = 0;
   const EGLBoolean result = eglSwapBuffers(surface_->egl().display_,
     surface_->egl().surface_);
   if (EGL_FALSE == result) {
@@ -106,12 +106,12 @@ void Screen::paint() {
   glClearColor(background[0], background[1], background[2], 0);
   glClear(GL_COLOR_BUFFER_BIT);
 
-  std::size_t left = dimensions_.leftPadding + dimensions_.scrollX;
-  std::size_t bottom = dimensions_.topPadding + dimensions_.scrollY + face_.lineHeight() * std::max(static_cast<int>(dimensions_.lines() - buffer_.lines()), 0);
+  int16_t left = dimensions_.leftPadding + dimensions_.scrollX;
+  int16_t bottom = dimensions_.topPadding + dimensions_.scrollY + face_.lineHeight() * std::max(static_cast<int>(dimensions_.lines() - buffer_.lines()), 0);
   dimensions_.column = 0;
   dimensions_.line = 0;
 
-  std::size_t remainingLines = dimensions_.lines();
+  uint16_t remainingLines = dimensions_.lines();
 
   for (const Buffer::Line & line : buffer_) {
     if (0 == remainingLines) {
@@ -122,7 +122,7 @@ void Screen::paint() {
 
     for (auto c /* c is a bad name */ : line) {
       const char d = c.character;
-      std::size_t width = dimensions_.glyphWidth; // that forces it to be monospaced.
+      uint16_t width = dimensions_.glyphWidth; // that forces it to be monospaced.
 
       switch (d) {
         case '\t': // HORIZONTAL TAB
@@ -184,26 +184,23 @@ void Screen::paint() {
         << glyph.top << " " << glyph.height << " " << dimensions_.glyphHeight << std::endl;
       #endif
 
+      const float vertex_bottom = -1.f + dimensions_.scaleHeight() * (bottom + glyph.top - (dimensions_.glyphDescender + glyph.height));
+      const float vertex_left = -1.f + dimensions_.scaleWidth() * (left + glyph.left);
+      const float vertex_right = -1.f + dimensions_.scaleWidth() * (left + glyph.left + glyph.width);
+      const float vertex_top = -1.f + dimensions_.scaleHeight() * (bottom + glyph.top - dimensions_.glyphDescender);
+
       const float vertices[4][4] = {
         // vertex a - top left
-        { -1.f + dimensions_.scaleWidth() * (left + glyph.left),
-          -1.f + dimensions_.scaleHeight() * (bottom + glyph.top - dimensions_.glyphDescender),
-          0, 0, },
+        { vertex_left, vertex_top, 0, 0, },
 
         // vertex b - top right
-        { -1.f + dimensions_.scaleWidth() * (left + glyph.left + glyph.width),
-          -1.f + dimensions_.scaleHeight() * (bottom + glyph.top - dimensions_.glyphDescender),
-          1, 0, },
+        { vertex_right, vertex_top, 1, 0, },
 
         // vertex c - bottom right
-        { -1.f + dimensions_.scaleWidth() * (left + glyph.left + glyph.width),
-          -1.f + dimensions_.scaleHeight() * (bottom + glyph.top - (dimensions_.glyphDescender + glyph.height)),
-          1, 1, },
+        { vertex_right, vertex_bottom, 1, 1, },
 
         // vertex d - bottom left
-        { -1.f + dimensions_.scaleWidth() * (left + glyph.left),
-          -1.f + dimensions_.scaleHeight() * (bottom + glyph.top - (dimensions_.glyphDescender + glyph.height)),
-          0, 1, },
+        { vertex_left, vertex_bottom, 0, 1, },
       }; 
 
       glGenBuffers(1, &vertex_buffer);
@@ -243,7 +240,7 @@ void Screen::paint() {
       switch (d) {
         case '\t': // HORIZONTAL TAB
           {
-            const std::size_t tab = 8 - dimensions_.column % 8;
+            const uint16_t tab = 8 - dimensions_.column % 8;
             dimensions_.column += tab;
           }
           break;
@@ -288,9 +285,6 @@ void Screen::dimensions() {
   dimensions_.glyphWidth = face_.glyphWidth();
   dimensions_.surfaceHeight = surface_->height();
   dimensions_.surfaceWidth = surface_->width();
-  #if 0
-  std::cout << dimensions_ << std::endl;
-  #endif
 }
 
 std::ostream & operator << (std::ostream & o, const Dimensions & d) {
