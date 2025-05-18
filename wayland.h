@@ -108,6 +108,12 @@ struct Connection {
       uint32_t key,
       uint32_t state);
 
+  void pointerButton(struct wl_pointer * pointer,
+    uint32_t serial,
+    uint32_t time,
+    uint32_t button,
+    uint32_t state);
+
   void pointerAxis(struct wl_pointer * pointer,
       uint32_t time,
       uint32_t axis,
@@ -144,7 +150,8 @@ struct Connection {
   bool running_ = false;
 
   std::function<void (const char *)> onKeyPress;
-  std::function<void (uint32_t, int32_t)> onPointerAxisChange;
+  std::function<void (uint32_t, int32_t)> onPointerAxis;
+  std::function<void (uint32_t, uint32_t)> onPointerButton;
 
   friend class EGL;
   friend class Surface;

@@ -44,6 +44,7 @@ struct Screen {
   void loadFace(Args && ... args) {
     face_ = freetype_.load(std::forward<Args>(args)...);
     dimensions();
+    repaint_ = true;
   }
 
   static Screen New(const wayland::Connection &);

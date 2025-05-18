@@ -110,7 +110,11 @@ constexpr static struct wl_pointer_listener PointerListener{
     uint32_t serial,
     uint32_t time,
     uint32_t button,
-    uint32_t state) { /* UNIMPLEMENTED */ }},
+    uint32_t state) {
+      Connection * const connection = static_cast<Connection *>(data);
+      assert(nullptr != connection);
+      connection->pointerButton(pointer, serial, time, button, state);
+    }},
 
   .axis{[](void * data,
     struct wl_pointer * pointer,
@@ -470,8 +474,14 @@ void Connection::keyboardKey(struct wl_keyboard * keyboard, uint32_t serial, uin
 }
 
 void Connection::pointerAxis(struct wl_pointer * pointer, uint32_t time, uint32_t axis, int32_t value) {
-  if (static_cast<bool>(onPointerAxisChange)) {
-    onPointerAxisChange(axis, value);
+  if (static_cast<bool>(onPointerAxis)) {
+    onPointerAxis(axis, value);
+  }
+}
+
+void Connection::pointerButton(struct wl_pointer * pointer, uint32_t serial, uint32_t time, uint32_t button, uint32_t state) {
+  if (static_cast<bool>(onPointerButton)) {
+    onPointerButton(button, state);
   }
 }
 

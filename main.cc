@@ -53,14 +53,39 @@ int main(int argc, char ** argv) {
     terminal.write(key, strlen(key));
   };
 
-  connection.onPointerAxisChange = [&](uint32_t axis, int32_t value) {
+  connection.onPointerAxis = [&](uint32_t axis, int32_t value) {
+    enum {
+      Y = 0,
+      X = 1,
+    };
     switch (axis) {
-    case 0:
+    case Y:
       screen.changeScrollY(value);
       break;
-    case 1:
+    case X:
       screen.changeScrollX(value);
       break;
+    }
+  };
+
+  connection.onPointerButton = [&](uint32_t button, uint32_t state) {
+    enum {
+      RELEASE = 0,
+      CLICK = 1,
+      LEFT = 272,
+      RIGHT = 273,
+    };
+    if (CLICK == state) {
+      switch (button) {
+      case LEFT:
+        screen.loadFace("/usr/share/fonts/liberation-fonts/LiberationMono-Regular.ttf", ++faceSize);
+        break;
+      case RIGHT:
+        screen.loadFace("/usr/share/fonts/liberation-fonts/LiberationMono-Regular.ttf", --faceSize);
+        break;
+      default:
+        break;
+      }
     }
   };
 
