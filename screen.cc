@@ -22,8 +22,8 @@ static const char* fragment_shader_text =
   "    gl_FragColor = vec4(mix(background, color, character), 1.0);\n"
   "}\n";
 
-const float background[3] = { 0.4f, 0.2f, 0.5f, };
-const float color[3] = { 0.8f, 0.4f, 1.f, };
+const float background[3] = { 0.f, 0.f, 0.f, };
+const float color[3] = { 0.f, 1.f, 0.f, };
 
 static GLuint vertex_shader = 0;
 static GLuint fragment_shader = 0;
@@ -134,9 +134,9 @@ void Screen::paint() {
           }
           c.character = ' ';
           c.hasBackgroundColor = true;
-          c.backgroundColor.red = 0.8f;
+          c.backgroundColor.red = 0.0f;
           c.backgroundColor.green = 0.4f;
-          c.backgroundColor.blue = 1.f;
+          c.backgroundColor.blue = 0.f;
           c.backgroundColor.alpha = 1.f;
           break;
         case '\r': // CARRIAGE RETURN
@@ -145,14 +145,14 @@ void Screen::paint() {
         case '\n': // NEW LINE
           c.character = '$';
           c.hasBackgroundColor = true;
-          c.backgroundColor.red = 0.8f;
+          c.backgroundColor.red = 0.0f;
           c.backgroundColor.green = 0.4f;
-          c.backgroundColor.blue = 1.f;
+          c.backgroundColor.blue = 0.f;
           c.backgroundColor.alpha = 1.f;
           c.hasForegroundColor = true;
-          c.foregroundColor.red = 0.4f;
-          c.foregroundColor.green = 0.2f;
-          c.foregroundColor.blue = 0.5f;
+          c.foregroundColor.red = 0.f;
+          c.foregroundColor.green = 0.f;
+          c.foregroundColor.blue = 0.f;
           c.foregroundColor.alpha = 1.f;
           break;
         default:

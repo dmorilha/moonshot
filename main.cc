@@ -35,7 +35,7 @@ int main(int argc, char ** argv) {
     faceSize = std::atoi(argv[1]);
   }
 
-  screen.loadFace("/usr/share/fonts/liberation-fonts/LiberationMono-Regular.ttf", faceSize);
+  screen.loadFace("/usr/share/fonts/liberation-fonts/LiberationMono-Bold.ttf", faceSize);
 
   connection.roundtrip();
 
@@ -78,10 +78,10 @@ int main(int argc, char ** argv) {
     if (CLICK == state) {
       switch (button) {
       case LEFT:
-        screen.loadFace("/usr/share/fonts/liberation-fonts/LiberationMono-Regular.ttf", ++faceSize);
+        screen.loadFace("/usr/share/fonts/liberation-fonts/LiberationMono-Bold.ttf", ++faceSize);
         break;
       case RIGHT:
-        screen.loadFace("/usr/share/fonts/liberation-fonts/LiberationMono-Regular.ttf", --faceSize);
+        screen.loadFace("/usr/share/fonts/liberation-fonts/LiberationMono-Bold.ttf", --faceSize);
         break;
       default:
         break;
