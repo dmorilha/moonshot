@@ -4,6 +4,8 @@
 #include <memory>
 #include <string>
 
+#include <pty.h>
+
 #include "poller.h"
 
 struct Screen;
@@ -22,8 +24,10 @@ protected:
   Terminal(Screen * const);
   const static std::string path;
   Screen * const screen_ = nullptr;
-  char columns[128] = "COLUMNS=60";
-  char lines[128] = "LINES=60";
+  struct winsize winsize_{
+    .ws_row = 0,
+    .ws_col = 0,
+  };
   struct {
     int child = 0;
     int parent = 0;

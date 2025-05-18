@@ -62,18 +62,15 @@ std::unique_ptr<Terminal> Terminal::New(Screen * const screen) {
     instance = std::unique_ptr<Terminal>(new Terminal(screen));
   }
 
-  const struct winsize winsize{ .ws_row = 38, .ws_col = 136, };
+  instance->winsize_.ws_col = screen->getColumns();
+  instance->winsize_.ws_row = screen->getLines();
+  openpty(&instance->fd_.child, &instance->fd_.parent, nullptr, nullptr, &instance->winsize_);
 
-  openpty(&instance->fd_.child, &instance->fd_.parent, nullptr, nullptr, &winsize);
   instance->pid_ = fork();
   if (0 == instance->pid_) { /* CHILD */
     close(instance->fd_.child);
     login_tty(instance->fd_.parent);
-    putenv(instance->columns);
-    putenv(instance->lines);
     unsetenv("COLORTERM");
-    unsetenv("COLUMNS");
-    unsetenv("LINES");
     unsetenv("TERMCAP");
     const int returnValue = execvp(Terminal::path.c_str(), nullptr);
     if (0 != returnValue) {
@@ -94,11 +91,14 @@ void Terminal::write(const char * const key, std::size_t length) {
 }
 
 void Terminal::resize(int32_t width, int32_t height) {
-  std::cout << __func__ << std::endl;
   assert(nullptr != screen_);
-  const std::string c = std::to_string(screen_->getColumns());
-  std::copy(c.begin(), c.end(), columns + 8);
-  const std::string l = std::to_string(screen_->getRows());
-  std::copy(l.begin(), l.end(), lines + 6);
-  std::cout << __func__ << " " << columns << ", " << lines << std::endl;
+  winsize_.ws_col = screen_->getColumns();
+  winsize_.ws_row = screen_->getLines();
+  #if 0
+  winsize_.ws_xpixel = 1;
+  winsize_.ws_ypixel = 1;
+  #endif
+  assert(0 < fd_.child);
+  const int result = ioctl(fd_.child, TIOCSWINSZ, &winsize_);
+  assert(0 <= result);
 }

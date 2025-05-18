@@ -16,14 +16,14 @@ struct Dimensions {
   std::size_t glyphHeight = 0;
   std::size_t glyphWidth = 0;
   std::size_t leftPadding = 10;
-  std::size_t row = 0;
+  std::size_t line = 0;
   int32_t scrollX = 0;
   int32_t scrollY = 0;
   std::size_t surfaceHeight = 0;
   std::size_t surfaceWidth = 0;
   std::size_t topPadding = 10;
   constexpr std::size_t columns() const { return std::floor((surfaceWidth - leftPadding * 2) / glyphWidth); }
-  constexpr std::size_t rows() const { return std::floor((surfaceHeight - topPadding * 2) / glyphHeight); }
+  constexpr std::size_t lines() const { return std::floor((surfaceHeight - topPadding * 2) / glyphHeight); }
   constexpr float scaleHeight() const { return 2.f / surfaceHeight; }
   constexpr float scaleWidth() const { return 2.f / surfaceWidth; }
 
@@ -63,7 +63,7 @@ struct Screen {
   }
 
   int32_t getColumns() const { return dimensions_.columns(); }
-  int32_t getRows() const { return dimensions_.rows(); }
+  int32_t getLines() const { return dimensions_.lines(); }
   void makeCurrent() const;
   void paint();
   void repaint();

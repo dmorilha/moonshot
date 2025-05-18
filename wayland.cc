@@ -119,7 +119,7 @@ constexpr static struct wl_pointer_listener PointerListener{
     wl_fixed_t value) {
       Connection * const connection = static_cast<Connection *>(data);
       assert(nullptr != connection);
-      int32_t v = wl_fixed_to_int(value);
+      const int32_t v = wl_fixed_to_int(value);
       connection->pointerAxis(pointer, time, axis, v);
     }},
 
@@ -133,7 +133,7 @@ constexpr static struct wl_pointer_listener PointerListener{
   .axis_stop{[](void * data,
       struct wl_pointer * pointer,
       uint32_t time,
-      uint32_t axis) { std::cout << "axis stop" << std::endl; /* UNIMPLEMENTED */ }},
+      uint32_t axis) { /* UNIMPLEMENTED */ }},
 
   .axis_discrete{[](void * data,
       struct wl_pointer * pointer,

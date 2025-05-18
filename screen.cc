@@ -107,20 +107,20 @@ void Screen::paint() {
   glClear(GL_COLOR_BUFFER_BIT);
 
   std::size_t left = dimensions_.leftPadding + dimensions_.scrollX;
-  std::size_t bottom = dimensions_.topPadding + dimensions_.scrollY + face_.lineHeight() * std::max(static_cast<int>(dimensions_.rows() - buffer_.rows()), 0);
+  std::size_t bottom = dimensions_.topPadding + dimensions_.scrollY + face_.lineHeight() * std::max(static_cast<int>(dimensions_.lines() - buffer_.lines()), 0);
   dimensions_.column = 0;
-  dimensions_.row = 0;
+  dimensions_.line = 0;
 
-  std::size_t remainingLines = dimensions_.rows();
+  std::size_t remainingLines = dimensions_.lines();
 
-  for (const Buffer::Row & row : buffer_) {
+  for (const Buffer::Line & line : buffer_) {
     if (0 == remainingLines) {
       break;
     }
 
     // do some line scanning if wrapping
 
-    for (auto c /* c is a bad name */ : row) {
+    for (auto c /* c is a bad name */ : line) {
       const char d = c.character;
       std::size_t width = dimensions_.glyphWidth; // that forces it to be monospaced.
 
@@ -259,7 +259,7 @@ nextLine:
     bottom += face_.lineHeight();
     left = dimensions_.leftPadding + dimensions_.scrollX;
     dimensions_.column = 0;
-    dimensions_.row -= 1;
+    dimensions_.line -= 1;
     remainingLines--;
   }
 
@@ -303,8 +303,8 @@ std::ostream & operator << (std::ostream & o, const Dimensions & d) {
     << ", glyphHeight " << d.glyphHeight
     << ", glyphWidth " << d.glyphWidth
     << ", leftPadding " << d.leftPadding
-    << ", row " << d.row
-    << ", rows " << d.rows()
+    << ", line " << d.line
+    << ", lines " << d.lines()
     << ", scaleHeight " << d.scaleHeight()
     << ", scaleWidth " << d.scaleWidth()
     << ", surfaceHeight " << d.surfaceHeight

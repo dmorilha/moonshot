@@ -3,14 +3,14 @@
 #include "buffer.h"
 
 Buffer::Buffer() {
-  rows_.emplace_back(Row{});
+  lines_.emplace_back(Line{});
 }
 
 void Buffer::clear() {
-  for (Row & row : rows_) {
-    row.clear();
+  for (Line & line : lines_) {
+    line.clear();
   }
-  rows_.clear();
+  lines_.clear();
 }
 
 void Buffer::push_back(const Char & c) {
@@ -23,8 +23,8 @@ void Buffer::push_back(const Char & c) {
 
     case '\b': // BACKSPACE
       {
-        if ( ! rows_.back().empty()) {
-          rows_.back().erase(rows_.back().end());
+        if ( ! lines_.back().empty()) {
+          lines_.back().erase(lines_.back().end());
         }
         return;
       }
@@ -40,14 +40,14 @@ void Buffer::push_back(const Char & c) {
 
   #if 0
   assert(0 < columns_);
-  if (columns_ <= rows_.back().size()) {
+  if (columns_ <= lines_.back().size()) {
     newLine = true;
   }
   #endif
 
-  rows_.back().push_back(c);
+  lines_.back().push_back(c);
 
   if (newLine) {
-    rows_.emplace_back(Row{});
+    lines_.emplace_back(Line{});
   }
 }
