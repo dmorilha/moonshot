@@ -38,13 +38,6 @@ void Buffer::push_back(const Char & c) {
       break;
   }
 
-  #if 0
-  assert(0 < columns_);
-  if (columns_ <= lines_.back().size()) {
-    newLine = true;
-  }
-  #endif
-
   lines_.back().push_back(c);
 
   if (newLine) {

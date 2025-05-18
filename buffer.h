@@ -6,7 +6,6 @@
 
 #include "char.h"
 
-/* need to come with some type of wraping */
 struct Buffer {
   // not the most efficient storage
   using Line = std::vector< Char >;

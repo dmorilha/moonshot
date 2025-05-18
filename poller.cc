@@ -1,4 +1,3 @@
-#include <iostream>
 #include <cassert>
 
 #include "poller.h"
@@ -33,6 +32,6 @@ void Poller::poll() {
           events_[index]->pollhup();
         }
       }
-    } /* else wait */
+    }
   }
 }

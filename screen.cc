@@ -28,7 +28,6 @@ const float color[3] = { 0.f, 1.f, 0.f, };
 static GLuint vertex_shader = 0;
 static GLuint fragment_shader = 0;
 
-// C++ question ? at some point this may throw 
 Screen Screen::New(const wayland::Connection & connection) {
   auto egl = connection.egl();
   std::unique_ptr<wayland::Surface> surface = connection.surface(std::move(egl));
@@ -81,19 +80,11 @@ void Screen::resize(int32_t width, int32_t height) {
 Screen::Screen(Screen && other) : surface_(std::move(other.surface_)) { }
 
 void Screen::makeCurrent() const {
-  const auto & egl = surface_->egl();
-  const auto r = eglMakeCurrent(egl.display_, egl.surface_, egl.surface_, egl.context_);
+  surface_->egl().makeCurrent();
 }
 
 bool Screen::swapGLBuffers() const {
-  static uint16_t it = 0;
-  const EGLBoolean result = eglSwapBuffers(surface_->egl().display_,
-    surface_->egl().surface_);
-  if (EGL_FALSE == result) {
-    std::cerr << "EGL buffer swap failed. " << it <<  std::endl;
-  }
-  ++it;
-  return EGL_TRUE == result;
+  return surface_->egl().swapBuffers();
 }
 
 void Screen::clear() {
@@ -261,15 +252,6 @@ nextLine:
     dimensions_.line -= 1;
     remainingLines--;
   }
-
-  #if 0
-  // cursor
-  glEnable(GL_SCISSOR_TEST);
-  glScissor(dimensions_.cursor_left, surface_->height() - dimensions_.cursor_top - face_.lineHeight(), face_.glyphWidth(), face_.lineHeight());
-  glClearColor(background[0], background[1], background[2], 1);
-  glClear(GL_COLOR_BUFFER_BIT);
-  glDisable(GL_SCISSOR_TEST);
-  #endif
 
   swapGLBuffers();
 }

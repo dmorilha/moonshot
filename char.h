@@ -2,8 +2,8 @@
 
 struct Color {
   float red = 1.f;
-  float green = 0.f;
-  float blue = 0.f;
+  float green = 1.f;
+  float blue = 1.f;
   float alpha = 1.f;
   operator float* () const { return (float *)this; }
 };

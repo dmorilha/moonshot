@@ -35,7 +35,7 @@ struct Poller {
   void on() { running_ = true; }
   void poll();
 
-// private:
+private:
   std::vector<struct pollfd> files_ = {};
   std::vector<std::unique_ptr<Events>> events_ = {};
   struct timespec time_{.tv_sec = 60, .tv_nsec = 0,};

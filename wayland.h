@@ -24,6 +24,9 @@
 #include "xdg-shell.h"
 
 namespace wayland {
+
+struct Connection;
+
 struct EGL {
   ~EGL(); 
   EGL() = default;
@@ -35,14 +38,17 @@ struct EGL {
 
   void resize(std::size_t, std::size_t);
 
-// private:
+  void makeCurrent() const;
+  bool swapBuffers() const;
+
+private:
   EGLContext context_ = nullptr;
   EGLDisplay display_ = nullptr;
   EGLSurface surface_ = nullptr;
   struct wl_egl_window * eglWindow_ = nullptr;
-};
 
-struct Surface;
+  friend class Connection;
+};
 
 struct Surface {
   ~Surface() = default;
@@ -59,15 +65,18 @@ struct Surface {
 
   const EGL & egl() const { return egl_; }
 
-// private:
   void onToplevelConfigure(struct xdg_toplevel *, const int32_t, const int32_t, struct wl_array *);
+
   std::function<void (int32_t, int32_t)> onResize;
 
+private:
   EGL egl_;
   struct xdg_surface * surface_ = nullptr;
   struct xdg_toplevel * toplevel_ = nullptr;
-  std::size_t height_ = 0;
-  std::size_t width_ = 0;
+  uint16_t height_ = 0;
+  uint16_t width_ = 0;
+
+  friend class Connection;
 };
 
 //capabilities could be aggregated through multiple inheritance
@@ -82,7 +91,6 @@ struct Connection {
   void roundtrip() const;
   int fd() const;
 
-// private:
   void registryGlobal(struct wl_registry * const registry,
       const uint32_t name,
       const std::string interface,
@@ -119,6 +127,11 @@ struct Connection {
       uint32_t axis,
       int32_t value);
 
+  std::function<void (const char *)> onKeyPress;
+  std::function<void (uint32_t, int32_t)> onPointerAxis;
+  std::function<void (uint32_t, uint32_t)> onPointerButton;
+
+private:
   struct wl_compositor * compositor_ = nullptr;
   struct wl_display * display_ = nullptr;
   struct wl_keyboard * keyboard_ = nullptr;
@@ -148,10 +161,6 @@ struct Connection {
   } outputMode_;
 
   bool running_ = false;
-
-  std::function<void (const char *)> onKeyPress;
-  std::function<void (uint32_t, int32_t)> onPointerAxis;
-  std::function<void (uint32_t, uint32_t)> onPointerButton;
 
   friend class EGL;
   friend class Surface;

@@ -10,7 +10,6 @@
 
 struct Screen;
 
-/* add support to terminal state machine emulation */
 struct Terminal : public Events {
   static std::unique_ptr<Terminal> New(Screen * const);
 

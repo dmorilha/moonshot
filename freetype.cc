@@ -63,31 +63,6 @@ Face Library::load(const std::string & filename, const uint16_t size, const uint
   face.glyphWidth_ = face.face_->glyph->advance.x / 64;
   face.lineHeight_ = face.face_->size->metrics.height / 64;
 
-#if 0
-  std::cout
-    << "face.face_->size->metrics.ascender "
-    << face.face_->size->metrics.ascender
-    << "\nface.face_->size->metrics.descender "
-    << face.face_->size->metrics.descender
-    << "\nface.face_->size->metrics.height "
-    << face.face_->size->metrics.height
-    << "\nface.face_->size->metrics.max_advance "
-    << face.face_->size->metrics.max_advance
-    << "\nface.face_->size->metrics.x_ppem "
-    << face.face_->size->metrics.x_ppem
-    << "\nface.face_->size->metrics.x_scale "
-    << face.face_->size->metrics.x_scale
-    << "\nface.face_->size->metrics.y_ppem "
-    << face.face_->size->metrics.y_ppem
-    << "\nface.face_->size->metrics.y_scale "
-    << face.face_->size->metrics.y_scale
-    << "\nface.face_->glyph->advance.x "
-    << face.face_->glyph->advance.x
-    << "\nface.face_->glyph->advance.y "
-    << face.face_->glyph->advance.y
-    << std::endl;
-#endif
-
   return face;
 }
 
@@ -134,10 +109,6 @@ Glyph Face::glyph(const char codepoint) const {
     }
   }
 
-  #if 0
-  std::cout << "Is face_->glyph->bitmap.pixel_mode == FT_PIXEL_MODE_MONO ? " << (face_->glyph->bitmap.pixel_mode == FT_PIXEL_MODE_MONO ? "yes" : "no") << std::endl;
-  #endif
-
   assert(nullptr != face_->glyph);
 
   result.height = face_->glyph->bitmap.rows;
@@ -149,13 +120,28 @@ Glyph Face::glyph(const char codepoint) const {
 
   return result;
 }
-} // end of freetype namespace
 
-#if 0
-int main() {
-  freetype::Library l;
-  auto face = l.load("/usr/share/fonts/liberation-fonts/LiberationMono-Regular.ttf", 64);
-  freetype::Glyph glyph = face.glyph('0');
-  return 0;
+std::ostream & operator << (std::ostream & o, const Face & face) {
+    o << "size.metrics.ascender "
+      << face.face_->size->metrics.ascender << std::endl
+      << "size.metrics.descender "
+      << face.face_->size->metrics.descender << std::endl
+      << "size.metrics.height "
+      << face.face_->size->metrics.height << std::endl
+      << "size.metrics.max_advance "
+      << face.face_->size->metrics.max_advance << std::endl
+      << "size.metrics.x_ppem "
+      << face.face_->size->metrics.x_ppem << std::endl
+      << "size.metrics.x_scale "
+      << face.face_->size->metrics.x_scale << std::endl
+      << "size.metrics.y_ppem "
+      << face.face_->size->metrics.y_ppem << std::endl
+      << "size.metrics.y_scale "
+      << face.face_->size->metrics.y_scale << std::endl
+      << "glyph.advance.x "
+      << face.face_->glyph->advance.x << std::endl
+      << "glyph.advance.y "
+      << face.face_->glyph->advance.y << std::endl;
+    return o;
 }
-#endif
+} // end of freetype namespace

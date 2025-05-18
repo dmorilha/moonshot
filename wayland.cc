@@ -232,6 +232,23 @@ void EGL::resize(std::size_t width, std::size_t height) {
   return wl_egl_window_resize(eglWindow_, width, height, 0, 0);
 }
 
+void EGL::makeCurrent() const {
+  assert(nullptr != context_);
+  assert(nullptr != display_);
+  assert(nullptr != surface_);
+  const auto r = eglMakeCurrent(display_, surface_, surface_, context_);
+}
+
+bool EGL::swapBuffers() const {
+  assert(nullptr != display_);
+  assert(nullptr != surface_);
+  const EGLBoolean result = eglSwapBuffers(display_, surface_);
+  if (EGL_FALSE == result) {
+    std::cerr << "EGL buffer swap failed." << std::endl;
+  }
+  return EGL_TRUE == result;
+}
+
 Surface::Surface(Surface && other) :
   egl_(std::move(other.egl_)),
   surface_(other.surface_),

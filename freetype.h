@@ -18,7 +18,8 @@ struct Glyph {
   void * pixels = nullptr;
 };
 
-//RESEARCH: how glyphs are associated to faces?
+struct Library;
+
 struct Face {
   ~Face();
 
@@ -46,7 +47,10 @@ struct Face {
 
   Glyph glyph(const char) const;
 
-// private:
+  friend std::ostream & operator << (std::ostream &, const Face &);
+  friend class Library;
+
+private:
   FT_Face face_ = nullptr;
   uint16_t ascender_ = 0;
   int16_t descender_ = 0;
@@ -59,7 +63,7 @@ struct Library {
   ~Library();
   Library();
 
-  Face load(const std::string & filename, const uint16_t size = 12, const uint16_t dpi = 150);
+  Face load(const std::string &, const uint16_t, const uint16_t dpi = 150);
 
 private:
   FT_Library library_ = nullptr;
