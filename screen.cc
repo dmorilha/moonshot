@@ -28,13 +28,14 @@ const float color[3] = { 0.f, 1.f, 0.f, };
 static GLuint vertex_shader = 0;
 static GLuint fragment_shader = 0;
 
-Screen Screen::New(const wayland::Connection & connection) {
+Screen Screen::New(const wayland::Connection & connection, Font && font) {
   auto egl = connection.egl();
   std::unique_ptr<wayland::Surface> surface = connection.surface(std::move(egl));
 
   surface->setTitle("Terminal");
 
-  Screen result(std::move(surface));
+  Screen result(std::move(surface), std::move(font));
+  result.dimensions();
 
   result.makeCurrent();
   result.swapGLBuffers();
@@ -63,7 +64,7 @@ Screen Screen::New(const wayland::Connection & connection) {
   return result;
 }
 
-Screen::Screen(std::unique_ptr<wayland::Surface> && surface) : surface_(std::move(surface)) {
+Screen::Screen(std::unique_ptr<wayland::Surface> && surface, Font && font) : surface_(std::move(surface)), font_(std::move(font)) {
   assert(static_cast<bool>(surface_));
   surface_->onResize = std::bind_front(&Screen::resize, this);
 }
@@ -77,7 +78,7 @@ void Screen::resize(int32_t width, int32_t height) {
   repaint_ = true;
 }
 
-Screen::Screen(Screen && other) : surface_(std::move(other.surface_)) { }
+Screen::Screen(Screen && other) : surface_(std::move(other.surface_)), font_(std::move(other.font_)) { }
 
 void Screen::makeCurrent() const {
   surface_->egl().makeCurrent();
@@ -95,12 +96,14 @@ void Screen::clear() {
 void Screen::paint() {
   makeCurrent();
 
+  freetype::Face & face = font_.regular();
+
   glViewport(0, 0, dimensions_.surfaceWidth, dimensions_.surfaceHeight);
   glClearColor(background[0], background[1], background[2], 0);
   glClear(GL_COLOR_BUFFER_BIT);
 
   int16_t left = dimensions_.leftPadding + dimensions_.scrollX;
-  int16_t bottom = dimensions_.bottomPadding + dimensions_.scrollY + face_.lineHeight() * std::max(static_cast<int>(dimensions_.lines() - buffer_.lines()), 0);
+  int16_t bottom = dimensions_.bottomPadding + dimensions_.scrollY + face.lineHeight() * std::max(static_cast<int>(dimensions_.lines() - buffer_.lines()), 0);
   dimensions_.column = 0;
   dimensions_.line = 0;
 
@@ -114,6 +117,8 @@ void Screen::paint() {
     // do some line scanning if wrapping
 
     for (auto c /* c is a bad name */ : line) {
+      face = font_.regular();
+
       const char d = c.character;
       uint16_t width = dimensions_.glyphWidth; // that forces it to be monospaced.
 
@@ -134,6 +139,7 @@ void Screen::paint() {
           continue;
           break;
         case '\n': // NEW LINE
+          face = font_.italic();
           c.character = '$';
           c.hasBackgroundColor = true;
           c.backgroundColor.red = 0.0f;
@@ -150,7 +156,7 @@ void Screen::paint() {
           break;
       }
 
-      const freetype::Glyph glyph = face_.glyph(c.character);
+      const freetype::Glyph glyph = face.glyph(c.character);
 
       // background
       glEnable(GL_SCISSOR_TEST);
@@ -246,7 +252,7 @@ void Screen::paint() {
     }
 
 nextLine:
-    bottom += face_.lineHeight();
+    bottom += face.lineHeight();
     left = dimensions_.leftPadding + dimensions_.scrollX;
     dimensions_.column = 0;
     dimensions_.line -= 1;
@@ -264,10 +270,11 @@ void Screen::repaint() {
 }
 
 void Screen::dimensions() {
-  dimensions_.glyphAscender = face_.ascender();
-  dimensions_.glyphDescender = face_.descender();
-  dimensions_.glyphHeight = face_.lineHeight();
-  dimensions_.glyphWidth = face_.glyphWidth();
+  freetype::Face & face = font_.regular();
+  dimensions_.glyphAscender = face.ascender();
+  dimensions_.glyphDescender = face.descender();
+  dimensions_.glyphHeight = face.lineHeight();
+  dimensions_.glyphWidth = face.glyphWidth();
   dimensions_.surfaceHeight = surface_->height();
   dimensions_.surfaceWidth = surface_->width();
 }

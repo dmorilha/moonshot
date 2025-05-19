@@ -1,5 +1,3 @@
-#include <iostream>
-
 #include "buffer.h"
 
 Buffer::Buffer() {
@@ -13,7 +11,7 @@ void Buffer::clear() {
   lines_.clear();
 }
 
-void Buffer::push_back(const Char & c) {
+void Buffer::push_back(const Rune & c) {
   bool newLine = false;
   switch (c.character) {
     case '\a': // BELL

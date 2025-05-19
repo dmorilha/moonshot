@@ -26,8 +26,10 @@ struct Face {
   Face() = default;
   Face(const Face &) = delete;
   Face(Face && other);
-  Face & operator = (const Face &) = delete;
+  Face & operator = (const Face &) = default;
   Face & operator = (Face && other);
+
+  operator bool () const { return nullptr != face_; }
 
   uint16_t ascender() const {
     return ascender_;

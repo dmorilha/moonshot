@@ -4,11 +4,11 @@
 
 #include <cassert>
 
-#include "char.h"
+#include "rune.h"
 
 struct Buffer {
   // not the most efficient storage
-  using Line = std::vector< Char >;
+  using Line = std::vector< Rune >;
   using Lines = std::vector< Line >;
 
   Buffer();
@@ -17,7 +17,7 @@ struct Buffer {
   Lines::const_reverse_iterator end() const { return lines_.rend(); }
   std::size_t lines() const { return lines_.size(); }
   void clear();
-  void push_back(const Char &);
+  void push_back(const Rune &);
 
 private:
   Lines lines_;

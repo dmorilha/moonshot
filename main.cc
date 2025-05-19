@@ -2,7 +2,7 @@
 #include <iostream>
 #include <vector>
 
-#include "char.h"
+#include "rune.h"
 #include "freetype.h"
 #include "poller.h"
 #include "screen.h"
@@ -28,14 +28,16 @@ int main(int argc, char ** argv) {
   wayland::Connection connection;
   connection.connect();
   connection.capabilities();
-  Screen screen{Screen::New(connection)};
 
-  int faceSize =  8;
-  if (1 < argc) {
-    faceSize = std::atoi(argv[1]);
-  }
+  auto font = Font::New({
+    .bold = "/usr/share/fonts/liberation-fonts/LiberationMono-Bold.ttf",
+    .boldItalic = "/usr/share/fonts/liberation-fonts/LiberationMono-BoldItalic.ttf",
+    .italic = "/usr/share/fonts/liberation-fonts/LiberationMono-Italic.ttf",
+    .regular = "/usr/share/fonts/liberation-fonts/LiberationMono-Regular.ttf",
+    .size = 8,
+  });
 
-  screen.loadFace("/usr/share/fonts/liberation-fonts/LiberationMono-Bold.ttf", faceSize);
+  Screen screen{Screen::New(connection, std::move(font))};
 
   connection.roundtrip();
 
@@ -78,10 +80,8 @@ int main(int argc, char ** argv) {
     if (CLICK == state) {
       switch (button) {
       case LEFT:
-        screen.loadFace("/usr/share/fonts/liberation-fonts/LiberationMono-Bold.ttf", ++faceSize);
         break;
       case RIGHT:
-        screen.loadFace("/usr/share/fonts/liberation-fonts/LiberationMono-Bold.ttf", --faceSize);
         break;
       default:
         break;

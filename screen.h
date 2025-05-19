@@ -4,6 +4,7 @@
 #include <vector>
 
 #include "buffer.h"
+#include "font.h"
 #include "freetype.h"
 #include "wayland.h"
 
@@ -40,14 +41,16 @@ struct Screen {
   Screen & operator = (const Screen &) = delete;
   Screen & operator = (Screen && other) = delete;
 
+  #if 0
   template <class ... Args>
   void loadFace(Args && ... args) {
     face_ = freetype_.load(std::forward<Args>(args)...);
     dimensions();
     repaint_ = true;
   }
+  #endif
 
-  static Screen New(const wayland::Connection &);
+  static Screen New(const wayland::Connection &, Font &&);
 
   Buffer & buffer() { return buffer_; }
   void clear();
@@ -75,13 +78,12 @@ struct Screen {
   std::function<void (int32_t, int32_t)> onResize;
 
 private:
-  Screen(std::unique_ptr<wayland::Surface> &&);
+  Screen(std::unique_ptr<wayland::Surface> &&, Font &&);
 
   void dimensions();
 
-  freetype::Library freetype_ = {};
+  Font font_;
 
-  freetype::Face face_ = {};
   std::unique_ptr<wayland::Surface> surface_;
 
   GLuint glProgram_ = 0;

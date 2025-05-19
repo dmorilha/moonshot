@@ -49,7 +49,7 @@ void vt100::pollin() {
           state_ = ESCAPE;
           break;
         default:
-          screen_->buffer().push_back(Char{ .character = buffer[i], });
+          screen_->buffer().push_back(Rune{ .character = buffer[i], });
           break;
         }
       }

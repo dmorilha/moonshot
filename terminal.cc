@@ -27,7 +27,7 @@ void Terminal::pollin() {
   ssize_t length = read(fd_.child, buffer.data(), buffer.size() - 1);
   while (0 < length) {
     for (std::size_t i = 0; i < length; ++i) {
-      screen_->buffer().push_back(Char{ .character = buffer[i], });
+      screen_->buffer().push_back(Rune{ .character = buffer[i], });
     }
     length = read(fd_.child, buffer.data(), buffer.size() - 1);
   }

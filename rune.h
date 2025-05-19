@@ -8,12 +8,20 @@ struct Color {
   operator float* () const { return (float *)this; }
 };
 
-struct Char {
+struct Rune {
   bool hasBackgroundColor = false;
   bool hasForegroundColor = false;
   Color backgroundColor;
   Color foregroundColor;
   char character;
-  const Char & operator = (const char c) { character = c; return *this; }
+
+  enum {
+    REGULAR,
+    BOLD,
+    ITALIC,
+    BOLD_AND_ITALIC,
+  } style = REGULAR;
+
+  const Rune & operator = (const char c) { character = c; return *this; }
   bool operator == (const char c) const { return character == c; }
 };
