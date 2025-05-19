@@ -14,7 +14,7 @@ struct Dimensions {
   uint16_t cursor_top = 10;
   uint16_t glyphAscender = 0;
   int16_t glyphDescender = 0;
-  uint16_t glyphHeight = 0;
+  uint16_t lineHeight = 0;
   uint16_t glyphWidth = 0;
   uint16_t leftPadding = 10;
   uint16_t line = 0;
@@ -24,7 +24,7 @@ struct Dimensions {
   uint16_t surfaceWidth = 0;
   uint16_t bottomPadding = 10;
   constexpr uint16_t columns() const { return std::floor((surfaceWidth - leftPadding * 2) / glyphWidth); }
-  constexpr uint16_t lines() const { return std::floor((surfaceHeight - bottomPadding * 2) / glyphHeight); }
+  constexpr uint16_t lines() const { return std::floor((surfaceHeight - bottomPadding * 2) / lineHeight); }
   constexpr float scaleHeight() const { return 2.f / surfaceHeight; }
   constexpr float scaleWidth() const { return 2.f / surfaceWidth; }
 

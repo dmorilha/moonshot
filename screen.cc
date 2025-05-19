@@ -96,14 +96,12 @@ void Screen::clear() {
 void Screen::paint() {
   makeCurrent();
 
-  freetype::Face & face = font_.regular();
-
   glViewport(0, 0, dimensions_.surfaceWidth, dimensions_.surfaceHeight);
   glClearColor(background[0], background[1], background[2], 0);
   glClear(GL_COLOR_BUFFER_BIT);
 
   int16_t left = dimensions_.leftPadding + dimensions_.scrollX;
-  int16_t bottom = dimensions_.bottomPadding + dimensions_.scrollY + face.lineHeight() * std::max(static_cast<int>(dimensions_.lines() - buffer_.lines()), 0);
+  int16_t bottom = dimensions_.bottomPadding + dimensions_.scrollY + dimensions_.lineHeight * std::max(static_cast<int>(dimensions_.lines() - buffer_.lines()), 0);
   dimensions_.column = 0;
   dimensions_.line = 0;
 
@@ -117,8 +115,6 @@ void Screen::paint() {
     // do some line scanning if wrapping
 
     for (auto c /* c is a bad name */ : line) {
-      face = font_.regular();
-
       const char d = c.character;
       uint16_t width = dimensions_.glyphWidth; // that forces it to be monospaced.
 
@@ -139,8 +135,8 @@ void Screen::paint() {
           continue;
           break;
         case '\n': // NEW LINE
-          face = font_.italic();
           c.character = '$';
+          c.style = c.ITALIC;
           c.hasBackgroundColor = true;
           c.backgroundColor.red = 0.0f;
           c.backgroundColor.green = 0.4f;
@@ -156,11 +152,28 @@ void Screen::paint() {
           break;
       }
 
-      const freetype::Glyph glyph = face.glyph(c.character);
+      freetype::Glyph glyph;
+      switch (c.style) {
+        case c.BOLD:
+          glyph = font_.bold().glyph(c.character);
+          break;
+        case c.BOLD_AND_ITALIC:
+          glyph = font_.boldItalic().glyph(c.character);
+          break;
+        case c.ITALIC:
+          glyph = font_.italic().glyph(c.character);
+          break;
+        case c.REGULAR:
+          glyph = font_.regular().glyph(c.character);
+          break;
+        default:
+          assert(!"unreacheable");
+          break;
+      }
 
       // background
       glEnable(GL_SCISSOR_TEST);
-      glScissor(left, bottom, width, dimensions_.glyphHeight);
+      glScissor(left, bottom, width, dimensions_.lineHeight);
       if (c.hasBackgroundColor) {
         glClearColor(c.backgroundColor.red, c.backgroundColor.green, c.backgroundColor.blue, c.backgroundColor.alpha); 
       } else {
@@ -180,7 +193,7 @@ void Screen::paint() {
 
       #if 0
       std::cout << c.character << " " << glyph.left << " " << glyph.width << " "
-        << glyph.top << " " << glyph.height << " " << dimensions_.glyphHeight << std::endl;
+        << glyph.top << " " << glyph.height << " " << dimensions_.lineHeight << std::endl;
       #endif
 
       const float vertex_bottom = -1.f + dimensions_.scaleHeight() * (bottom + glyph.top - (dimensions_.glyphDescender + glyph.height));
@@ -252,7 +265,7 @@ void Screen::paint() {
     }
 
 nextLine:
-    bottom += face.lineHeight();
+    bottom += dimensions_.lineHeight;
     left = dimensions_.leftPadding + dimensions_.scrollX;
     dimensions_.column = 0;
     dimensions_.line -= 1;
@@ -273,7 +286,7 @@ void Screen::dimensions() {
   freetype::Face & face = font_.regular();
   dimensions_.glyphAscender = face.ascender();
   dimensions_.glyphDescender = face.descender();
-  dimensions_.glyphHeight = face.lineHeight();
+  dimensions_.lineHeight = face.lineHeight();
   dimensions_.glyphWidth = face.glyphWidth();
   dimensions_.surfaceHeight = surface_->height();
   dimensions_.surfaceWidth = surface_->width();
@@ -286,7 +299,7 @@ std::ostream & operator << (std::ostream & o, const Dimensions & d) {
     << ", cursor_top " << d.cursor_top
     << ", glyphAscender " << d.glyphAscender
     << ", glyphDescender " << d.glyphDescender
-    << ", glyphHeight " << d.glyphHeight
+    << ", lineHeight " << d.lineHeight
     << ", glyphWidth " << d.glyphWidth
     << ", leftPadding " << d.leftPadding
     << ", line " << d.line
