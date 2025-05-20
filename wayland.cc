@@ -374,6 +374,14 @@ std::unique_ptr<Surface> Connection::surface(EGL && egl) const {
 }
 
 Connection::~Connection() {
+  if (nullptr != xkb_.compose_state) {
+    xkb_compose_state_unref(xkb_.compose_state);
+    xkb_.compose_state = nullptr;
+  }
+  if (nullptr != xkb_.compose_table) {
+    xkb_compose_table_unref(xkb_.compose_table);
+    xkb_.compose_table = nullptr;
+  }
   if (nullptr != xkb_.state) {
     xkb_state_unref(xkb_.state);
     xkb_.state = nullptr;
@@ -461,31 +469,74 @@ void Connection::keyboardKeymap(struct wl_keyboard * keyboard,
   assert(nullptr != xkb_.keymap);
   close(fd);
 
+  {
+    const std::string locale = setlocale(LC_CTYPE, "");
+    std::cout << "LC_CTYPE " << locale << std::endl;
+    xkb_.compose_table = xkb_compose_table_new_from_locale(xkb_.context, locale.c_str(), XKB_COMPOSE_COMPILE_NO_FLAGS);
+    assert(nullptr != xkb_.compose_table);
+  }
+
+  xkb_.compose_state = xkb_compose_state_new(xkb_.compose_table, XKB_COMPOSE_STATE_NO_FLAGS);
+  assert(nullptr != xkb_.compose_state);
+
   // should be a class
   xkb_.state = xkb_state_new(xkb_.keymap);
   assert(nullptr != xkb_.state);
 }
 
-/*
- * there is a list of todos here
- * what happens when the key is pressed and is not released?
- * international punctuation marks are not working.
- * the current onKeyPress is ugly
- * utf-8 handling smells
- */
 void Connection::keyboardKey(struct wl_keyboard * keyboard, uint32_t serial, uint32_t time, uint32_t key, uint32_t state) {
-  const uint32_t code = key + 8;
+  const uint32_t keycode = key + 8;
+
   const enum xkb_key_direction direction =
     (WL_KEYBOARD_KEY_STATE_PRESSED == state) ?
     XKB_KEY_DOWN : XKB_KEY_UP;
 
-  xkb_state_update_key(xkb_.state, code, direction);
+  xkb_state_update_key(xkb_.state, keycode, direction);
+
+  const xkb_keysym_t keysym = xkb_state_key_get_one_sym(xkb_.state, keycode);
+
+  if (XKB_COMPOSE_FEED_ACCEPTED == xkb_compose_state_feed(xkb_.compose_state, keysym)) {
+    const xkb_compose_status status = xkb_compose_state_get_status(xkb_.compose_state);
+#if 0
+    std::cout << "status ";
+    switch (status) {
+    case XKB_COMPOSE_NOTHING:
+      std::cout << "XKB_COMPOSE_NOTHING";
+      break;
+    case XKB_COMPOSE_COMPOSING:
+      std::cout << "XKB_COMPOSE_COMPOSING";
+      break;
+    case XKB_COMPOSE_COMPOSED:
+      std::cout << "XKB_COMPOSE_COMPOSED";
+      break;
+    case XKB_COMPOSE_CANCELLED:
+      std::cout << "XKB_COMPOSE_CANCELLED";
+      break;
+    default:
+      std::cout << "UNKNOWN";
+      break;
+    }
+    std::cout << std::endl;
+#endif
+    if (XKB_COMPOSE_COMPOSED == status) {
+      std::array<char, 5> buffer{'\0'};
+      const int size = xkb_compose_state_get_utf8(xkb_.compose_state, buffer.data(), buffer.size());
+#if DEBUG
+      const ssize_t bytes = mbrtowc(nullptr, buffer.data(), buffer.size(), nullptr);
+      assert(size == bytes);
+#endif
+      if (static_cast<bool>(onKeyPress)) {
+        onKeyPress(buffer.data(), size);
+      }
+      return;
+    }
+  }
 
   if (WL_KEYBOARD_KEY_STATE_PRESSED == state) {
-    std::array<char, 10> buffer{'\0'};
-    xkb_state_key_get_utf8(xkb_.state, code, buffer.data(), buffer.size());
+    std::array<char, 5> buffer{'\0'};
+    const int size = xkb_state_key_get_utf8(xkb_.state, keycode, buffer.data(), buffer.size());
     if (static_cast<bool>(onKeyPress)) {
-      onKeyPress(buffer.data());
+      onKeyPress(buffer.data(), size);
     }
   }
 }

@@ -12,10 +12,10 @@ main: main.cc buffer.cc freetype.cc freetype.h font.cc font.h poller.cc poller.h
 	$(CXX) $(CXX_FLAGS) -c -o poller.o poller.cc;
 	$(CXX) $(CXX_FLAGS) -c -o screen.o screen.cc;
 	$(CXX) $(CXX_FLAGS) -c -o terminal.o terminal.cc;
-	$(CXX) $(CXX_FLAGS) -c -o vt100.o vt100.cc;
+	# $(CXX) $(CXX_FLAGS) -c -o vt100.o vt100.cc;
 	$(CXX) $(CXX_FLAGS) -c -o wayland.o wayland.cc;
 	$(CXX) $(CXX_FLAGS) -c -o main.o main.cc;
-	$(CXX) $(CXX_FLAGS) $(LIBS) -o $@ buffer.o freetype.o font.o main.o poller.o screen.o terminal.o vt100.o xdg-shell.o wayland.o;
+	$(CXX) $(CXX_FLAGS) $(LIBS) -o $@ buffer.o freetype.o font.o main.o poller.o screen.o terminal.o xdg-shell.o wayland.o;
 
 clean:
 	rm -v main *.o

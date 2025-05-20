@@ -89,7 +89,7 @@ Face & Face::operator = (Face && other) {
   return *this;
 }
 
-Glyph Face::glyph(const char codepoint) const {
+Glyph Face::glyph(const wchar_t codepoint) const {
   assert(nullptr != face_);
   Glyph result;
 

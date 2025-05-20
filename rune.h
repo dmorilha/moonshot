@@ -1,11 +1,13 @@
 #pragma once
 
+#include <cwchar>
+
 struct Color {
   float red = 1.f;
   float green = 1.f;
   float blue = 1.f;
   float alpha = 1.f;
-  operator float* () const { return (float *)this; }
+  operator const float * () const { return reinterpret_cast< const float * >(this); }
 };
 
 struct Rune {
@@ -13,7 +15,7 @@ struct Rune {
   bool hasForegroundColor = false;
   Color backgroundColor;
   Color foregroundColor;
-  char character;
+  wchar_t character;
 
   enum {
     REGULAR,

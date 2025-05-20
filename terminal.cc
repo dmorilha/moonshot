@@ -5,6 +5,7 @@
 #include <vector>
 
 #include <cassert>
+#include <cwchar>
 
 #include <fcntl.h>
 #include <pty.h>
@@ -15,21 +16,75 @@
 #include "buffer.h"
 #include "screen.h"
 #include "terminal.h"
-#include "vt100.h"
 
 const std::string Terminal::path = "/bin/bash";
 
 Terminal::Terminal(Screen * const screen) : Events(POLLIN | POLLHUP), screen_(screen) { }
 
 void Terminal::pollin() {
-  std::array<char, 1025> buffer{'\0'};
   assert(nullptr != screen_);
-  ssize_t length = read(fd_.child, buffer.data(), buffer.size() - 1);
-  while (0 < length) {
-    for (std::size_t i = 0; i < length; ++i) {
-      screen_->buffer().push_back(Rune{ .character = buffer[i], });
+
+  ssize_t length = 0;
+  {
+    const ssize_t result = read(fd_.child, buffer_.data() + bufferStart_, buffer_.size() - bufferStart_);
+    if (0 > result) {
+      if (EAGAIN == errno) {
+        return;
+      } else {
+        assert(!"ERROR");
+      }
     }
-    length = read(fd_.child, buffer.data(), buffer.size() - 1);
+    length = bufferStart_ + result;
+  }
+  while (bufferStart_ < length) {
+    uint16_t iterator = 0;
+    while (length > iterator) {
+      wchar_t character;
+      const size_t size = length - iterator;
+      const ssize_t bytes = mbrtowc(&character, &buffer_[iterator], size, nullptr);
+      assert(4 >= bytes);
+      assert(bytes <= size);
+      #if DEBUG
+      std::array<char, 5> display{'\0'};
+      strncpy(display.data(), static_cast<const char *>(&buffer_[iterator]), bytes);
+      std::cout << __func__ << ": " << iterator << ", " << bufferStart_ << ", " << length << ", " << size << " " << display.data() << std::endl;
+      #endif //DEBUG
+      switch (bytes) {
+      case -2: /* INCOMPLETE */
+        return;
+        if (0 < iterator) {
+          strncpy(&buffer_[0], &buffer_[iterator], size);
+        }
+        bufferStart_ = iterator = size;
+        assert(4 > bufferStart_);
+        break;
+      case -1: /* INVALID */
+        std::cout << "INVALID " << iterator << ", " << bufferStart_ << ", " << length << ", " << size << ", " << bytes << std::endl;
+        assert(!"INVALID");
+        break;
+      case 0: /* ODD */
+        bufferStart_ = 0;
+        break;
+      default:
+        screen_->buffer().push_back(Rune{ .character = character });
+        iterator += bytes;
+        bufferStart_ = 0;
+        break;
+      }
+    }
+
+    {
+      const ssize_t result = read(fd_.child, buffer_.data() + bufferStart_, buffer_.size() - bufferStart_);
+      if (0 > result) {
+        if (EAGAIN == errno) {
+          break;
+        } else {
+          assert(!"ERROR");
+        }
+      }
+      length = bufferStart_ + result;
+    }
+
   }
   screen_->write();
 }
@@ -55,12 +110,8 @@ std::unique_ptr<Terminal> Terminal::New(Screen * const screen) {
   std::transform(terminalType.begin(), terminalType.end(), terminalType.begin(),
     std::bind(std::tolower<std::string::value_type>, std::placeholders::_1, std::locale::classic()));
 
-  if ("vt100" == terminalType) {
-    instance = std::unique_ptr<Terminal>(new vt100(screen));
-  } else {
-    unsetenv("TERM");
-    instance = std::unique_ptr<Terminal>(new Terminal(screen));
-  }
+  unsetenv("TERM");
+  instance = std::unique_ptr<Terminal>(new Terminal(screen));
 
   instance->winsize_.ws_col = screen->getColumns();
   instance->winsize_.ws_row = screen->getLines();
@@ -84,7 +135,7 @@ std::unique_ptr<Terminal> Terminal::New(Screen * const screen) {
   return instance;
 }
 
-void Terminal::write(const char * const key, std::size_t length) {
+void Terminal::write(const char * const key, const size_t length) {
   assert(0 < fd_.child);
   const ssize_t result = ::write(fd_.child, key, length);
   assert(0 <= result);

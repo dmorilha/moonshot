@@ -127,7 +127,7 @@ struct Connection {
       uint32_t axis,
       int32_t value);
 
-  std::function<void (const char *)> onKeyPress;
+  std::function<void (const char * const, const size_t)> onKeyPress;
   std::function<void (uint32_t, int32_t)> onPointerAxis;
   std::function<void (uint32_t, uint32_t)> onPointerButton;
 
@@ -146,6 +146,7 @@ private:
     struct xkb_context * context = nullptr;
     struct xkb_keymap * keymap = nullptr;
     struct xkb_state * state = nullptr;
+    struct xkb_state * clean_state = nullptr;
 
     struct xkb_compose_table * compose_table = nullptr;
     struct xkb_compose_state * compose_state = nullptr;

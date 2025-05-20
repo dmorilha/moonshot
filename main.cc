@@ -51,8 +51,8 @@ int main(int argc, char ** argv) {
     screen.repaint();
   })));
 
-  connection.onKeyPress = [&](const char * const key) {
-    terminal.write(key, strlen(key));
+  connection.onKeyPress = [&](const char * const key, const size_t bytes) {
+    terminal.write(key, bytes);
   };
 
   connection.onPointerAxis = [&](uint32_t axis, int32_t value) {

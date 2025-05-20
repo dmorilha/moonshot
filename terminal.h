@@ -17,7 +17,7 @@ struct Terminal : public Events {
   void pollhup() override;
   void pollin() override;
   void resize(int32_t width, int32_t height);
-  void write(const char * const, const std::size_t);
+  void write(const char * const, const size_t);
 
 protected:
   Terminal(Screen * const);
@@ -32,4 +32,6 @@ protected:
     int parent = 0;
   } fd_;
   pid_t pid_ = 0;
+  std::array<char, 1025> buffer_;
+  uint16_t bufferStart_ = 0;
 };

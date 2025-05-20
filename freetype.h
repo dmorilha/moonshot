@@ -47,7 +47,7 @@ struct Face {
     return lineHeight_;
   }
 
-  Glyph glyph(const char) const;
+  Glyph glyph(const wchar_t) const;
 
   friend std::ostream & operator << (std::ostream &, const Face &);
   friend class Library;
