@@ -469,35 +469,69 @@ void Connection::keyboardKeymap(struct wl_keyboard * keyboard,
   assert(nullptr != xkb_.keymap);
   close(fd);
 
+  xkb_.state = xkb_state_new(xkb_.keymap);
+  assert(nullptr != xkb_.state);
+
   {
     const std::string locale = setlocale(LC_CTYPE, "");
+#if DEBUG
     std::cout << "LC_CTYPE " << locale << std::endl;
+#endif
     xkb_.compose_table = xkb_compose_table_new_from_locale(xkb_.context, locale.c_str(), XKB_COMPOSE_COMPILE_NO_FLAGS);
     assert(nullptr != xkb_.compose_table);
   }
 
   xkb_.compose_state = xkb_compose_state_new(xkb_.compose_table, XKB_COMPOSE_STATE_NO_FLAGS);
   assert(nullptr != xkb_.compose_state);
-
-  // should be a class
-  xkb_.state = xkb_state_new(xkb_.keymap);
-  assert(nullptr != xkb_.state);
 }
 
-void Connection::keyboardKey(struct wl_keyboard * keyboard, uint32_t serial, uint32_t time, uint32_t key, uint32_t state) {
+void Connection::keyboardKey(struct wl_keyboard * keyboard,
+  uint32_t serial,
+  uint32_t time,
+  uint32_t key,
+  uint32_t state) {
   const uint32_t keycode = key + 8;
 
-  const enum xkb_key_direction direction =
-    (WL_KEYBOARD_KEY_STATE_PRESSED == state) ?
-    XKB_KEY_DOWN : XKB_KEY_UP;
+  const enum xkb_key_direction direction = (WL_KEYBOARD_KEY_STATE_PRESSED == state) ?  XKB_KEY_DOWN : XKB_KEY_UP;
 
   xkb_state_update_key(xkb_.state, keycode, direction);
 
+  uint32_t modifiers = xkb_state_serialize_mods(xkb_.state, XKB_STATE_MODS_EFFECTIVE);
+
   const xkb_keysym_t keysym = xkb_state_key_get_one_sym(xkb_.state, keycode);
+
+  switch (keysym) {
+  case XKB_KEY_Alt_L:
+  case XKB_KEY_Alt_R:
+  case XKB_KEY_Caps_Lock:
+  case XKB_KEY_Control_L:
+  case XKB_KEY_Control_R:
+  case XKB_KEY_Hyper_L:
+  case XKB_KEY_Hyper_R:
+  case XKB_KEY_Meta_L:
+  case XKB_KEY_Meta_R:
+  case XKB_KEY_Shift_L:
+  case XKB_KEY_Shift_Lock:
+  case XKB_KEY_Shift_R:
+  case XKB_KEY_Super_L:
+  case XKB_KEY_Super_R:
+    return;
+    break;
+
+  case XKB_KEY_NoSymbol:
+#if DEBUG
+    std::cerr << "no symbol" << std::endl;
+#endif
+    break;
+    
+  default:
+    break;
+  }
+
 
   if (XKB_COMPOSE_FEED_ACCEPTED == xkb_compose_state_feed(xkb_.compose_state, keysym)) {
     const xkb_compose_status status = xkb_compose_state_get_status(xkb_.compose_state);
-#if 0
+#if DEBUG
     std::cout << "status ";
     switch (status) {
     case XKB_COMPOSE_NOTHING:
@@ -518,16 +552,20 @@ void Connection::keyboardKey(struct wl_keyboard * keyboard, uint32_t serial, uin
     }
     std::cout << std::endl;
 #endif
+
     if (XKB_COMPOSE_COMPOSED == status) {
       std::array<char, 5> buffer{'\0'};
       const int size = xkb_compose_state_get_utf8(xkb_.compose_state, buffer.data(), buffer.size());
+
 #if DEBUG
       const ssize_t bytes = mbrtowc(nullptr, buffer.data(), buffer.size(), nullptr);
       assert(size == bytes);
 #endif
+
       if (static_cast<bool>(onKeyPress)) {
-        onKeyPress(buffer.data(), size);
+        onKeyPress(keysym, buffer.data(), size, modifiers);
       }
+
       return;
     }
   }
@@ -536,7 +574,7 @@ void Connection::keyboardKey(struct wl_keyboard * keyboard, uint32_t serial, uin
     std::array<char, 5> buffer{'\0'};
     const int size = xkb_state_key_get_utf8(xkb_.state, keycode, buffer.data(), buffer.size());
     if (static_cast<bool>(onKeyPress)) {
-      onKeyPress(buffer.data(), size);
+      onKeyPress(keysym, buffer.data(), size, modifiers);
     }
   }
 }

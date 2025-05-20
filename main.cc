@@ -51,8 +51,21 @@ int main(int argc, char ** argv) {
     screen.repaint();
   })));
 
-  connection.onKeyPress = [&](const char * const key, const size_t bytes) {
-    terminal.write(key, bytes);
+  connection.onKeyPress = [&](const uint32_t key, const char * const utf8, const size_t bytes, const uint32_t modifiers) {
+    // example as how to certain key sequences should be handled outside the shell.
+    if (0 != (modifiers & 0x4 /* crtl key */)) {
+      switch (key) {
+      case XKB_KEY_plus:
+        screen.increaseFontSize();
+        return;
+      case XKB_KEY_minus:
+        screen.decreaseFontSize();
+        return;
+      default:
+        break;
+      }
+    }
+    terminal.write(utf8, bytes);
   };
 
   connection.onPointerAxis = [&](uint32_t axis, int32_t value) {

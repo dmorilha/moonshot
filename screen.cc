@@ -38,7 +38,7 @@ Screen Screen::New(const wayland::Connection & connection, Font && font) {
   result.dimensions();
 
   result.makeCurrent();
-  result.swapGLBuffers();
+  result.swapBuffers();
 
   connection.roundtrip();
 
@@ -84,7 +84,7 @@ void Screen::makeCurrent() const {
   surface_->egl().makeCurrent();
 }
 
-bool Screen::swapGLBuffers() const {
+bool Screen::swapBuffers() const {
   return surface_->egl().swapBuffers();
 }
 
@@ -272,7 +272,7 @@ nextLine:
     remainingLines--;
   }
 
-  swapGLBuffers();
+  swapBuffers();
 }
 
 void Screen::repaint() {
@@ -290,6 +290,7 @@ void Screen::dimensions() {
   dimensions_.glyphWidth = face.glyphWidth();
   dimensions_.surfaceHeight = surface_->height();
   dimensions_.surfaceWidth = surface_->width();
+  repaint_ = true;
 }
 
 std::ostream & operator << (std::ostream & o, const Dimensions & d) {

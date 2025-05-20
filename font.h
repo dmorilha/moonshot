@@ -20,6 +20,10 @@ struct Font {
   Font(Font &&) = default;
   Font & operator = (Font &&) = delete;
 
+  void clear();
+  void decreaseSize() { clear(); --paths_.size; }
+  void increaseSize() { clear(); ++paths_.size; }
+
   freetype::Face & bold();
   freetype::Face & boldItalic();
   freetype::Face & italic();

@@ -68,10 +68,14 @@ struct Screen {
 
   int32_t getColumns() const { return dimensions_.columns(); }
   int32_t getLines() const { return dimensions_.lines(); }
+
+  void decreaseFontSize() { font_.decreaseSize(); dimensions(); }
+  void increaseFontSize() { font_.increaseSize(); dimensions(); }
+
   void makeCurrent() const;
   void paint();
   void repaint();
-  bool swapGLBuffers() const;
+  bool swapBuffers() const;
   void resize(int32_t, int32_t);
   void write() { repaint_ = true; }
 

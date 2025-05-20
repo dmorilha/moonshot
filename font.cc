@@ -45,3 +45,11 @@ freetype::Face & Font::regular() {
   }
   return regular_;
 }
+
+void Font::clear() {
+  boldItalic_ = std::move(freetype::Face());
+  bold_ = std::move(freetype::Face());
+  italic_ = std::move(freetype::Face());
+  regular_ = std::move(freetype::Face());
+}
+  

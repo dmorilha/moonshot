@@ -127,7 +127,7 @@ struct Connection {
       uint32_t axis,
       int32_t value);
 
-  std::function<void (const char * const, const size_t)> onKeyPress;
+  std::function<void (const uint32_t, const char * const, const size_t, const uint32_t)> onKeyPress;
   std::function<void (uint32_t, int32_t)> onPointerAxis;
   std::function<void (uint32_t, uint32_t)> onPointerButton;
 
@@ -150,10 +150,6 @@ private:
 
     struct xkb_compose_table * compose_table = nullptr;
     struct xkb_compose_state * compose_state = nullptr;
-
-    xkb_mod_mask_t ctrl_mask;
-    xkb_mod_mask_t alt_mask;
-    xkb_mod_mask_t shift_mask;
   } xkb_;
 
   struct {
