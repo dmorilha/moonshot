@@ -72,6 +72,7 @@ Screen::Screen(std::unique_ptr<wayland::Surface> && surface, Font && font) : sur
 void Screen::resize(int32_t width, int32_t height) {
   dimensions_.surfaceHeight = surface_->height();
   dimensions_.surfaceWidth = surface_->width();
+  /* pass the number of columns to the buffer for wrapping purposes */
   if (static_cast<bool>(onResize)) {
     onResize(width, height);
   }
@@ -93,6 +94,24 @@ void Screen::clear() {
   repaint_ = true;
 }
 
+void Screen::changeScrollY(const int32_t value) {
+  const int16_t scrollY = std::min(dimensions_.scrollY + value * 2, 0);
+  if (scrollY != dimensions_.scrollY
+      && dimensions_.lines() < buffer_.lines() + 1 + (scrollY / dimensions_.lineHeight)) {
+    dimensions_.scrollY = scrollY;
+    repaint_ = true;
+  }
+}
+
+void Screen::changeScrollX(const int32_t value) {
+  const int16_t scrollX = std::min(dimensions_.scrollX + value * 2, 0);
+  if (scrollX != dimensions_.scrollX) {
+    dimensions_.scrollX = scrollX;
+    repaint_ = true;
+  }
+}
+
+/* a spot for constant re-evaluation */
 void Screen::paint() {
   makeCurrent();
 
@@ -101,19 +120,26 @@ void Screen::paint() {
   glClear(GL_COLOR_BUFFER_BIT);
 
   int16_t left = dimensions_.leftPadding + dimensions_.scrollX;
-  int16_t bottom = dimensions_.bottomPadding + dimensions_.scrollY + dimensions_.lineHeight * std::max(static_cast<int>(dimensions_.lines() - buffer_.lines()), 0);
+  int16_t bottom = dimensions_.bottomPadding + (dimensions_.scrollY % dimensions_.lineHeight) + dimensions_.lineHeight * std::max(static_cast<int>(dimensions_.lines() - buffer_.lines()), 0);
   dimensions_.column = 0;
   dimensions_.line = 0;
 
-  uint16_t remainingLines = dimensions_.lines();
-
-  for (const Buffer::Line & line : buffer_) {
+  uint16_t remainingLines = dimensions_.lines() + 2;
+  uint16_t skip = std::abs(dimensions_.scrollY);
+  auto iterator = buffer_.begin();
+  const auto END = buffer_.end();
+  for (; END != iterator; ++iterator) {
     if (0 == remainingLines) {
       break;
     }
 
-    // do some line scanning if wrapping
+    while (dimensions_.lineHeight <= skip) {
+      skip -= dimensions_.lineHeight;
+      ++iterator;
+      assert(END != iterator);
+    }
 
+    const auto & line = *iterator;
     for (auto c /* c is a bad name */ : line) {
       const char d = c.character;
       uint16_t width = dimensions_.glyphWidth; // that forces it to be monospaced.

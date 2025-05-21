@@ -41,30 +41,23 @@ struct Screen {
   Screen & operator = (const Screen &) = delete;
   Screen & operator = (Screen && other) = delete;
 
-  #if 0
+#if 0
   template <class ... Args>
   void loadFace(Args && ... args) {
     face_ = freetype_.load(std::forward<Args>(args)...);
     dimensions();
     repaint_ = true;
   }
-  #endif
+#endif
 
   static Screen New(const wayland::Connection &, Font &&);
 
   Buffer & buffer() { return buffer_; }
   void clear();
 
-  // scrolling like this seems inefficient
-  void changeScrollY(int32_t value) {
-    dimensions_.scrollY += value * 2;
-    repaint_ = true;
-  }
+  void changeScrollY(const int32_t);
 
-  void changeScrollX(int32_t value) {
-    dimensions_.scrollX += value * 2;
-    repaint_ = true;
-  }
+  void changeScrollX(const int32_t);
 
   int32_t getColumns() const { return dimensions_.columns(); }
   int32_t getLines() const { return dimensions_.lines(); }
@@ -75,6 +68,7 @@ struct Screen {
   void makeCurrent() const;
   void paint();
   void repaint();
+  void resetScroll() { dimensions_.scrollX = dimensions_.scrollY = 0; }
   bool swapBuffers() const;
   void resize(int32_t, int32_t);
   void write() { repaint_ = true; }

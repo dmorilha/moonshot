@@ -1,5 +1,7 @@
 #pragma once
 
+#include <string>
+
 #include <cwchar>
 
 struct Color {
@@ -26,4 +28,7 @@ struct Rune {
 
   const Rune & operator = (const char c) { character = c; return *this; }
   bool operator == (const char c) const { return character == c; }
+  operator std::string() const;
+
+  friend std::ostream & operator << (std::ostream &, const Rune &);
 };

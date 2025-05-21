@@ -65,10 +65,12 @@ int main(int argc, char ** argv) {
         break;
       }
     }
+    screen.resetScroll(); // isn't what scroll lock is for ?
     terminal.write(utf8, bytes);
   };
 
   connection.onPointerAxis = [&](uint32_t axis, int32_t value) {
+    // how to handle keyboard modifiers to change different axis on a mouse
     enum {
       Y = 0,
       X = 1,
