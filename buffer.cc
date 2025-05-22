@@ -1,19 +1,18 @@
+#include <iostream>
+
 #include "buffer.h"
 
-Buffer::Buffer() {
-  lines_.emplace_back(Line{});
-}
-
 void Buffer::clear() {
-  for (Line & line : lines_) {
-    line.clear();
-  }
+  container_.clear();
   lines_.clear();
+  lines_.push_back(0);
+  state_ = INITIAL;
 }
 
-void Buffer::push_back(const Rune & c) {
+void Buffer::push_back(Rune && rune) {
   bool newLine = false;
-  switch (c.character) {
+  if (rune.iscontrol()) {
+    switch (rune.character) {
     case '\a': // BELL
       // what should we do?
       return;
@@ -21,9 +20,6 @@ void Buffer::push_back(const Rune & c) {
 
     case '\b': // BACKSPACE
       {
-        if ( ! lines_.back().empty()) {
-          lines_.back().erase(lines_.back().end());
-        }
         return;
       }
       break;
@@ -34,11 +30,55 @@ void Buffer::push_back(const Rune & c) {
 
     default:
       break;
+    }
   }
 
-  lines_.back().push_back(c);
+  container_.emplace_back(rune);
 
+  ++lines_.back();
   if (newLine) {
-    lines_.emplace_back(Line{});
+    lines_.push_back(0);
+    state_ = INITIAL;
   }
 }
+
+#if 0
+int main() {
+  Buffer buffer;
+
+  buffer.push_back(Rune{L'H'});
+  buffer.push_back(Rune{L'e'});
+  buffer.push_back(Rune{L'l'});
+  buffer.push_back(Rune{L'l'});
+  buffer.push_back(Rune{L'o'});
+
+  buffer.push_back(Rune{L'\n'});
+
+  buffer.push_back(Rune{L'W'});
+  buffer.push_back(Rune{L'o'});
+  buffer.push_back(Rune{L'r'});
+  buffer.push_back(Rune{L'l'});
+  buffer.push_back(Rune{L'd'});
+
+  buffer.push_back(Rune{L'\n'});
+
+  buffer.push_back(Rune{L'F'});
+  buffer.push_back(Rune{L'o'});
+  buffer.push_back(Rune{L'r'});
+  buffer.push_back(Rune{L'e'});
+  buffer.push_back(Rune{L'v'});
+  buffer.push_back(Rune{L'e'});
+  buffer.push_back(Rune{L'r'});
+  buffer.push_back(Rune{L'!'});
+
+  for (int i = 0; i < buffer.lines(); ++i) {
+    const auto line = buffer[i];
+    for (auto item : line) {
+      std::cout << item;
+    }
+  }
+
+  std::cout << std::endl;
+  return 0;
+}
+#endif

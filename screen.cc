@@ -1,6 +1,6 @@
 #include "screen.h"
 
-static const char* vertex_shader_text =
+static const char * const vertex_shader_text =
   "#version 120\n"
   "attribute vec4 vPos;\n"
   "varying vec2 texcoord;\n"
@@ -10,7 +10,7 @@ static const char* vertex_shader_text =
   "    gl_Position = vec4(vPos.xy, 0, 1);\n"
   "}\n";
 
-static const char* fragment_shader_text =
+static const char * const fragment_shader_text =
   "#version 120\n"
   "uniform sampler2D texture;\n"
   "uniform vec3 background;\n"
@@ -126,9 +126,8 @@ void Screen::paint() {
 
   uint16_t remainingLines = dimensions_.lines() + 2;
   uint16_t skip = std::abs(dimensions_.scrollY);
-  auto iterator = buffer_.begin();
-  const auto END = buffer_.end();
-  for (; END != iterator; ++iterator) {
+  const auto END = buffer_.rend();
+  for (auto iterator = buffer_.rbegin(); END != iterator; ++iterator) {
     if (0 == remainingLines) {
       break;
     }
@@ -150,6 +149,7 @@ void Screen::paint() {
             const std::size_t tab = 8 - dimensions_.column % 8;
             width *= tab;
           }
+          // DISPLAY
           c.character = ' ';
           c.hasBackgroundColor = true;
           c.backgroundColor.red = 0.0f;
@@ -161,6 +161,8 @@ void Screen::paint() {
           continue;
           break;
         case '\n': // NEW LINE
+#if DEBUG
+          // DISPLAY
           c.character = '$';
           c.style = c.ITALIC;
           c.hasBackgroundColor = true;
@@ -173,6 +175,7 @@ void Screen::paint() {
           c.foregroundColor.green = 0.f;
           c.foregroundColor.blue = 0.f;
           c.foregroundColor.alpha = 1.f;
+#endif
           break;
         default:
           break;
@@ -193,7 +196,7 @@ void Screen::paint() {
           glyph = font_.regular().glyph(c.character);
           break;
         default:
-          assert(!"unreacheable");
+          assert(!"UNREACHEABLE");
           break;
       }
 

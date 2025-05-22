@@ -1,24 +1,83 @@
 #pragma once
 
+#include <deque>
+#include <numeric>
+#include <span>
+#include <stdexcept>
 #include <vector>
 
 #include <cassert>
+#include <cstdint>
 
 #include "rune.h"
 
 struct Buffer {
-  // not the most efficient storage
-  using Line = std::vector< Rune >;
-  using Lines = std::vector< Line >;
+  using Container = std::vector<Rune>;
+  using Line = std::span<const Rune>;
 
-  Buffer();
+  struct const_reverse_iterator {
+    const Line operator * () {
+      const std::size_t size = buffer_.container_.size();
+      switch (line_) {
+      case 0:
+        throw std::runtime_error("cannot dereference end iterator");
+        break;
+      case 1:
+        return buffer_.firstLine();
+        break;
+      default:
+        return buffer_[line_ - 1];
+        break;
+      }
+      return Line();
+    }
 
-  Lines::const_reverse_iterator begin() const { return lines_.rbegin(); }
-  Lines::const_reverse_iterator end() const { return lines_.rend(); }
+    const_reverse_iterator & operator ++ () {
+      if (0 < line_) {
+        --line_;
+      }
+      return *this;
+    }
+
+    bool operator != (const_reverse_iterator & other) const {
+      return &buffer_ != &other.buffer_ || line_ != other.line_;
+    }
+
+  private:
+    const_reverse_iterator(const Buffer & b, const uint32_t l = 0) : buffer_(b), line_(l) { }
+    const Buffer & buffer_;
+    uint32_t line_ = 0;
+    friend class Buffer;
+  };
+
+  const_reverse_iterator rbegin() const { return const_reverse_iterator(*this, lines()); }
+  const_reverse_iterator rend() const { return const_reverse_iterator(*this); }
+
+  Line firstLine() const {
+    assert(!lines_.empty());
+    return Line(container_.begin(), lines_[0]);
+  }
+
+  Line lastLine() const {
+    return Line(container_.end() - lines_.back(), container_.end());
+  }
+
+  Line operator [] (const uint16_t i) const {
+    const std::size_t offset = std::accumulate(lines_.begin(), lines_.begin() + i, 0);
+    return Line(container_.begin() + offset, lines_[i]);
+  }
+
   std::size_t lines() const { return lines_.size(); }
   void clear();
-  void push_back(const Rune &);
+  void push_back(Rune &&);
 
-private:
-  Lines lines_;
+// private:
+  using Lines = std::deque<uint16_t>;
+
+  Container container_;
+  Lines lines_{0};
+
+  enum {
+    INITIAL = 0,
+  } state_ = INITIAL;
 };

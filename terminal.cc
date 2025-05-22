@@ -66,7 +66,7 @@ void Terminal::pollin() {
         bufferStart_ = 0;
         break;
       default:
-        screen_->buffer().push_back(Rune{ .character = character });
+        screen_->buffer().push_back(Rune{character});
         iterator += bytes;
         bufferStart_ = 0;
         break;
@@ -108,7 +108,7 @@ std::unique_ptr<Terminal> Terminal::New(Screen * const screen) {
   }
 
   std::transform(terminalType.begin(), terminalType.end(), terminalType.begin(),
-    std::bind(std::tolower<std::string::value_type>, std::placeholders::_1, std::locale::classic()));
+    std::bind(std::tolower<std::string::value_type>, std::placeholders::_1, std::locale("")));
 
   unsetenv("TERM");
   instance = std::unique_ptr<Terminal>(new Terminal(screen));

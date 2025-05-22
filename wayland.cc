@@ -473,7 +473,7 @@ void Connection::keyboardKeymap(struct wl_keyboard * keyboard,
   assert(nullptr != xkb_.state);
 
   {
-    const std::string locale = setlocale(LC_CTYPE, "");
+    const std::string locale = std::locale("").name();
 #if DEBUG
     std::cout << "LC_CTYPE " << locale << std::endl;
 #endif
