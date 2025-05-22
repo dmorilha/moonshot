@@ -44,11 +44,11 @@ void Terminal::pollin() {
       const ssize_t bytes = mbrtowc(&character, &buffer_[iterator], size, nullptr);
       assert(4 >= bytes);
       assert(bytes <= size);
-      #if DEBUG
+#if DEBUG
       std::array<char, 5> display{'\0'};
       strncpy(display.data(), static_cast<const char *>(&buffer_[iterator]), bytes);
       std::cout << __func__ << ": " << iterator << ", " << bufferStart_ << ", " << length << ", " << size << " " << display.data() << std::endl;
-      #endif //DEBUG
+#endif //DEBUG
       switch (bytes) {
       case -2: /* INCOMPLETE */
         return;

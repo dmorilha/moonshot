@@ -163,7 +163,7 @@ void Screen::paint() {
         case '\n': // NEW LINE
 #if DEBUG
           // DISPLAY
-          c.character = '$';
+          c.character = L'$';
           c.style = c.ITALIC;
           c.hasBackgroundColor = true;
           c.backgroundColor.red = 0.0f;
@@ -175,6 +175,8 @@ void Screen::paint() {
           c.foregroundColor.green = 0.f;
           c.foregroundColor.blue = 0.f;
           c.foregroundColor.alpha = 1.f;
+#else
+          goto nextLine;
 #endif
           break;
         default:
