@@ -16,21 +16,7 @@ struct Buffer {
   using Line = std::span<const Rune>;
 
   struct const_reverse_iterator {
-    const Line operator * () {
-      const std::size_t size = buffer_.container_.size();
-      switch (line_) {
-      case 0:
-        throw std::runtime_error("cannot dereference end iterator");
-        break;
-      case 1:
-        return buffer_.firstLine();
-        break;
-      default:
-        return buffer_[line_ - 1];
-        break;
-      }
-      return Line();
-    }
+    const Line operator * () const;
 
     const_reverse_iterator & operator ++ () {
       if (0 < line_) {
@@ -59,6 +45,7 @@ struct Buffer {
   }
 
   Line lastLine() const {
+    assert(!lines_.empty());
     return Line(container_.end() - lines_.back(), container_.end());
   }
 
@@ -71,7 +58,7 @@ struct Buffer {
   void clear();
   void push_back(Rune &&);
 
-// private:
+private:
   using Lines = std::deque<uint16_t>;
 
   Container container_;

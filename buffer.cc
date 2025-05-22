@@ -43,3 +43,20 @@ void Buffer::push_back(Rune && rune) {
     state_ = INITIAL;
   }
 }
+
+const Buffer::Line Buffer::const_reverse_iterator::operator * () const {
+  const std::size_t size = buffer_.container_.size();
+  switch (line_) {
+  case 0:
+    throw std::runtime_error("cannot dereference end iterator");
+    break;
+  case 1:
+    return buffer_.firstLine();
+    break;
+  /* it can be optimized in a reverse iterator context */
+  default:
+    return buffer_[line_ - 1];
+    break;
+  }
+  return Line();
+}
