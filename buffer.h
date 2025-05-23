@@ -37,6 +37,7 @@ struct Buffer {
   };
 
   const_reverse_iterator rbegin() const { return const_reverse_iterator(*this, lines()); }
+
   const_reverse_iterator rend() const { return const_reverse_iterator(*this); }
 
   Line firstLine() const {
@@ -54,6 +55,7 @@ struct Buffer {
     return Line(container_.begin() + offset, lines_[i]);
   }
 
+  void setCap(const std::size_t);
   std::size_t lines() const { return lines_.size(); }
   void clear();
   void push_back(Rune &&);
@@ -62,7 +64,8 @@ private:
   using Lines = std::deque<uint16_t>;
 
   Container container_;
-  Lines lines_{0};
+  Lines lines_ = {0};
+  std::size_t cap_ = 0;
 
   enum {
     INITIAL = 0,

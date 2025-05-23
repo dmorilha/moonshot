@@ -1,5 +1,3 @@
-#include <iostream>
-
 #include "buffer.h"
 
 void Buffer::clear() {
@@ -39,8 +37,20 @@ void Buffer::push_back(Rune && rune) {
 
   ++lines_.back();
   if (newLine) {
+    if (0 < cap_ && lines_.size() > cap_) {
+      container_.erase(container_.begin(), container_.begin() + lines_[0]);
+      lines_.erase(lines_.begin());
+    }
     lines_.push_back(0);
     state_ = INITIAL;
+  }
+}
+
+void Buffer::setCap(const std::size_t c) {
+  cap_ = c;
+  if (lines_.size() > cap_) {
+    const std::size_t length = lines_[lines_.size() - cap_ - 1];
+    container_.erase(container_.begin(), container_.begin() + length);
   }
 }
 
