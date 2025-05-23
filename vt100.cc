@@ -9,6 +9,7 @@
 
 vt100::vt100(Screen * const screen) : Terminal(screen) { }
 
+/* does not handle unicode properly */
 void vt100::pollin() {
   std::array<char, 1025> buffer{'\0'};
   assert(nullptr != screen_);
@@ -23,20 +24,20 @@ void vt100::pollin() {
       }
       if (CSI == state_) {
         switch (c) {
-        case 'H': // move cursor
+        case L'H': // move cursor
           state_ = DEFAULT;
           break;
-        case 'J': // clear screen
+        case L'J': // clear screen
           state_ = DEFAULT;
           screen_->clear();
           break;
-        case '?':
+        case L'?':
           state_ = DEFAULT;
           break;
         }
       } else if (ESCAPE == state_) {
         switch (c) {
-        case '[':
+        case L'[':
           state_ = CSI;
           break;
         default:
@@ -45,7 +46,7 @@ void vt100::pollin() {
         }
       } else if (DEFAULT == state_)  {
         switch (c) {
-        case '\e':
+        case L'\e':
           state_ = ESCAPE;
           break;
         default:

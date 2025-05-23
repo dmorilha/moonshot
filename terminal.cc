@@ -22,6 +22,12 @@ const std::string Terminal::path = "/bin/bash";
 
 Terminal::Terminal(Screen * const screen) : Events(POLLIN | POLLHUP), screen_(screen) { }
 
+/* pollin should:
+ *  - be broken into a generic piece towards reuse.
+ *  - make use of mbrstowcs to parse multiple characters.
+ *  - the parsed characters are then pumped into the caller
+ *    for further processing.
+ */
 void Terminal::pollin() {
   assert(nullptr != screen_);
 
