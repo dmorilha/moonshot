@@ -16,6 +16,7 @@
 #include "buffer.h"
 #include "screen.h"
 #include "terminal.h"
+#include "vt100.h"
 
 const std::string Terminal::path = "/bin/bash";
 
@@ -110,8 +111,12 @@ std::unique_ptr<Terminal> Terminal::New(Screen * const screen) {
   std::transform(terminalType.begin(), terminalType.end(), terminalType.begin(),
     std::bind(std::tolower<std::string::value_type>, std::placeholders::_1, std::locale("")));
 
-  unsetenv("TERM");
-  instance = std::unique_ptr<Terminal>(new Terminal(screen));
+  if ("vt100" == terminalType) {
+    instance = std::unique_ptr<Terminal>(new vt100(screen));
+  } else {
+    unsetenv("TERM");
+    instance = std::unique_ptr<Terminal>(new Terminal(screen));
+  }
 
   instance->winsize_.ws_col = screen->getColumns();
   instance->winsize_.ws_row = screen->getLines();
