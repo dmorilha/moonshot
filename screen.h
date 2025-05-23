@@ -73,6 +73,9 @@ struct Screen {
   void resize(int32_t, int32_t);
   void write() { repaint_ = true; }
 
+  /* how to handle cursor */
+  void setCursor(const uint32_t column, const uint32_t line);
+
   std::function<void (int32_t, int32_t)> onResize;
 
 private:

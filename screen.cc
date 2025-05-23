@@ -138,75 +138,74 @@ void Screen::paint() {
       assert(END != iterator);
     }
 
-    const auto & line = *iterator;
-    for (auto c /* c is a bad name */ : line) {
-      const char d = c.character;
+    for (auto rune : *iterator) {
+      const char character = rune.character;
       uint16_t width = dimensions_.glyphWidth; // that forces it to be monospaced.
 
-      switch (d) {
-        case '\t': // HORIZONTAL TAB
-          {
-            const std::size_t tab = 8 - dimensions_.column % 8;
-            width *= tab;
-          }
-          // DISPLAY
-          c.character = ' ';
-          c.hasBackgroundColor = true;
-          c.backgroundColor.red = 0.0f;
-          c.backgroundColor.green = 0.4f;
-          c.backgroundColor.blue = 0.f;
-          c.backgroundColor.alpha = 1.f;
-          break;
-        case '\r': // CARRIAGE RETURN
-          continue;
-          break;
-        case '\n': // NEW LINE
+      switch (character) {
+      case '\t': // HORIZONTAL TAB
+        {
+          const std::size_t tab = 8 - dimensions_.column % 8;
+          width *= tab;
+        }
+        // DISPLAY
+        rune.character = L' ';
+        rune.hasBackgroundColor = true;
+        rune.backgroundColor.red = 0.0f;
+        rune.backgroundColor.green = 0.4f;
+        rune.backgroundColor.blue = 0.f;
+        rune.backgroundColor.alpha = 1.f;
+        break;
+      case '\r': // CARRIAGE RETURN
+        continue;
+        break;
+      case '\n': // NEW LINE
 #if DEBUG
-          // DISPLAY
-          c.character = L'$';
-          c.style = c.ITALIC;
-          c.hasBackgroundColor = true;
-          c.backgroundColor.red = 0.0f;
-          c.backgroundColor.green = 0.4f;
-          c.backgroundColor.blue = 0.f;
-          c.backgroundColor.alpha = 1.f;
-          c.hasForegroundColor = true;
-          c.foregroundColor.red = 0.f;
-          c.foregroundColor.green = 0.f;
-          c.foregroundColor.blue = 0.f;
-          c.foregroundColor.alpha = 1.f;
+        // DISPLAY
+        rune.character = L'$';
+        rune.style = rune.ITALIC;
+        rune.hasBackgroundColor = true;
+        rune.backgroundColor.red = 0.0f;
+        rune.backgroundColor.green = 0.4f;
+        rune.backgroundColor.blue = 0.f;
+        rune.backgroundColor.alpha = 1.f;
+        rune.hasForegroundColor = true;
+        rune.foregroundColor.red = 0.f;
+        rune.foregroundColor.green = 0.f;
+        rune.foregroundColor.blue = 0.f;
+        rune.foregroundColor.alpha = 1.f;
 #else
-          goto nextLine;
+        goto nextLine;
 #endif
-          break;
-        default:
-          break;
+        break;
+      default:
+        break;
       }
 
       freetype::Glyph glyph;
-      switch (c.style) {
-        case c.BOLD:
-          glyph = font_.bold().glyph(c.character);
-          break;
-        case c.BOLD_AND_ITALIC:
-          glyph = font_.boldItalic().glyph(c.character);
-          break;
-        case c.ITALIC:
-          glyph = font_.italic().glyph(c.character);
-          break;
-        case c.REGULAR:
-          glyph = font_.regular().glyph(c.character);
-          break;
-        default:
-          assert(!"UNREACHEABLE");
-          break;
+      switch (rune.style) {
+      case rune.BOLD:
+        glyph = font_.bold().glyph(rune.character);
+        break;
+      case rune.BOLD_AND_ITALIC:
+        glyph = font_.boldItalic().glyph(rune.character);
+        break;
+      case rune.ITALIC:
+        glyph = font_.italic().glyph(rune.character);
+        break;
+      case rune.REGULAR:
+        glyph = font_.regular().glyph(rune.character);
+        break;
+      default:
+        assert(!"UNREACHEABLE");
+        break;
       }
 
       // background
       glEnable(GL_SCISSOR_TEST);
       glScissor(left, bottom, width, dimensions_.lineHeight);
-      if (c.hasBackgroundColor) {
-        glClearColor(c.backgroundColor.red, c.backgroundColor.green, c.backgroundColor.blue, c.backgroundColor.alpha); 
+      if (rune.hasBackgroundColor) {
+        glClearColor(rune.backgroundColor.red, rune.backgroundColor.green, rune.backgroundColor.blue, rune.backgroundColor.alpha); 
       } else {
         glClearColor(background[0], background[1], background[2], 1);
       }
@@ -223,7 +222,7 @@ void Screen::paint() {
       glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 
       #if 0
-      std::cout << c.character << " " << glyph.left << " " << glyph.width << " "
+      std::cout << rune.character << " " << glyph.left << " " << glyph.width << " "
         << glyph.top << " " << glyph.height << " " << dimensions_.lineHeight << std::endl;
       #endif
 
@@ -256,15 +255,15 @@ void Screen::paint() {
       glUniform1i(location_.texture, 0);
 
       assert(0 <= location_.background);
-      if (c.hasBackgroundColor) {
-        glUniform3fv(location_.background, 1, c.backgroundColor);
+      if (rune.hasBackgroundColor) {
+        glUniform3fv(location_.background, 1, rune.backgroundColor);
       } else {
         glUniform3fv(location_.background, 1, background);
       }
 
       assert(0 <= location_.color);
-      if (c.hasForegroundColor) {
-        glUniform3fv(location_.color, 1, c.foregroundColor);
+      if (rune.hasForegroundColor) {
+        glUniform3fv(location_.color, 1, rune.foregroundColor);
       } else {
         glUniform3fv(location_.color, 1, color);
       }
@@ -280,18 +279,18 @@ void Screen::paint() {
       glDeleteTextures(1, &texture);
 
       left += width;
-      switch (d) {
-        case '\t': // HORIZONTAL TAB
-          {
-            const uint16_t tab = 8 - dimensions_.column % 8;
-            dimensions_.column += tab;
-          }
-          break;
-        case '\n': // NEW LINE
-          goto nextLine;
-        default:
-          dimensions_.column += 1;
-          break;
+      switch (character) {
+      case '\t': // HORIZONTAL TAB
+        {
+          const uint16_t tab = 8 - dimensions_.column % 8;
+          dimensions_.column += tab;
+        }
+        break;
+      case '\n': // NEW LINE
+        goto nextLine;
+      default:
+        dimensions_.column += 1;
+        break;
       }
     }
 
