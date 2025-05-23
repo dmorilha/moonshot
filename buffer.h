@@ -22,6 +22,7 @@ struct Buffer {
       if (0 < line_) {
         --line_;
       }
+      currentOffset_ -= buffer_.lines_[line_];
       return *this;
     }
 
@@ -30,9 +31,11 @@ struct Buffer {
     }
 
   private:
-    const_reverse_iterator(const Buffer & b, const uint32_t l = 0) : buffer_(b), line_(l) { }
+    const_reverse_iterator(const Buffer &, const uint32_t l = 0);
     const Buffer & buffer_;
     uint32_t line_ = 0;
+    std::size_t currentOffset_;
+
     friend class Buffer;
   };
 
@@ -55,7 +58,7 @@ struct Buffer {
     return Line(container_.begin() + offset, lines_[i]);
   }
 
-  void setCap(const std::size_t);
+  void setCap(const uint32_t);
   std::size_t lines() const { return lines_.size(); }
   void clear();
   void push_back(Rune &&);
@@ -65,7 +68,7 @@ private:
 
   Container container_;
   Lines lines_ = {0};
-  std::size_t cap_ = 0;
+  uint32_t cap_ = 0;
 
   enum {
     INITIAL = 0,
