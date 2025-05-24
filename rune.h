@@ -4,13 +4,7 @@
 
 #include <cwchar>
 
-struct Color {
-  float red = 1.f;
-  float green = 1.f;
-  float blue = 1.f;
-  float alpha = 1.f;
-  operator const float * () const { return reinterpret_cast< const float * >(this); }
-};
+#include "types.h"
 
 struct Rune {
   bool hasBackgroundColor = false;

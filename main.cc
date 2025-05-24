@@ -95,6 +95,7 @@ int main(int argc, char ** argv) {
     if (CLICK == state) {
       switch (button) {
       case LEFT:
+        screen.setCursor(10, 10);
         break;
       case RIGHT:
         break;

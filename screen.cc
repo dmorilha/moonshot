@@ -1,5 +1,7 @@
 #include "screen.h"
+#include "types.h"
 
+namespace {
 static const char * const vertex_shader_text =
   "#version 120\n"
   "attribute vec4 vPos;\n"
@@ -27,6 +29,8 @@ const float color[3] = { 0.f, 1.f, 0.f, };
 
 static GLuint vertex_shader = 0;
 static GLuint fragment_shader = 0;
+
+} // end of annonymous namespace
 
 Screen Screen::New(const wayland::Connection & connection, Font && font) {
   auto egl = connection.egl();
@@ -81,14 +85,6 @@ void Screen::resize(int32_t width, int32_t height) {
 
 Screen::Screen(Screen && other) : surface_(std::move(other.surface_)), font_(std::move(other.font_)) { }
 
-void Screen::makeCurrent() const {
-  surface_->egl().makeCurrent();
-}
-
-bool Screen::swapBuffers() const {
-  return surface_->egl().swapBuffers();
-}
-
 void Screen::clear() {
   buffer_.clear();
   repaint_ = true;
@@ -112,9 +108,12 @@ void Screen::changeScrollX(const int32_t value) {
 }
 
 /* a spot for constant re-evaluation */
-void Screen::paint() {
-  makeCurrent();
 
+/*
+ * by evaluating "wayst" source code, it becomes clear that to gain on
+ * performace the "screen" has to allow for merges of modified rects.
+ */
+void Screen::paint() {
   glViewport(0, 0, dimensions_.surfaceWidth, dimensions_.surfaceHeight);
   glClearColor(background[0], background[1], background[2], 0);
   glClear(GL_COLOR_BUFFER_BIT);
@@ -143,7 +142,7 @@ void Screen::paint() {
       uint16_t width = dimensions_.glyphWidth; // that forces it to be monospaced.
 
       switch (character) {
-      case '\t': // HORIZONTAL TAB
+      case L'\t': // HORIZONTAL TAB
         {
           const std::size_t tab = 8 - dimensions_.column % 8;
           width *= tab;
@@ -156,10 +155,10 @@ void Screen::paint() {
         rune.backgroundColor.blue = 0.f;
         rune.backgroundColor.alpha = 1.f;
         break;
-      case '\r': // CARRIAGE RETURN
+      case L'\r': // CARRIAGE RETURN
         continue;
         break;
-      case '\n': // NEW LINE
+      case L'\n': // NEW LINE
 #if DEBUG
         // DISPLAY
         rune.character = L'$';
@@ -212,20 +211,12 @@ void Screen::paint() {
       glClear(GL_COLOR_BUFFER_BIT);
       glDisable(GL_SCISSOR_TEST);
 
-      // texture
-      GLuint texture, vertex_buffer;
-      glGenTextures(1, &texture);
-      glBindTexture(GL_TEXTURE_2D, texture);
-      glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
-      glTexImage2D(GL_TEXTURE_2D, 0, GL_LUMINANCE, glyph.width, glyph.height, 0, GL_LUMINANCE, GL_UNSIGNED_BYTE, glyph.pixels);
-      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-
       #if 0
       std::cout << rune.character << " " << glyph.left << " " << glyph.width << " "
         << glyph.top << " " << glyph.height << " " << dimensions_.lineHeight << std::endl;
       #endif
 
+      // vertices
       const float vertex_bottom = -1.f + dimensions_.scaleHeight() * (bottom + glyph.top - (dimensions_.glyphDescender + glyph.height));
       const float vertex_left = -1.f + dimensions_.scaleWidth() * (left + glyph.left);
       const float vertex_right = -1.f + dimensions_.scaleWidth() * (left + glyph.left + glyph.width);
@@ -234,21 +225,26 @@ void Screen::paint() {
       const float vertices[4][4] = {
         // vertex a - left top
         { vertex_left, vertex_top, 0, 0, },
-
         // vertex b - right top
         { vertex_right, vertex_top, 1, 0, },
-
         // vertex c - right bottom
         { vertex_right, vertex_bottom, 1, 1, },
-
         // vertex d - left bottom
         { vertex_left, vertex_bottom, 0, 1, },
       }; 
 
+      GLuint texture, vertex_buffer;
       glGenBuffers(1, &vertex_buffer);
       glBindBuffer(GL_ARRAY_BUFFER, vertex_buffer);
       glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
 
+      // texture
+      glGenTextures(1, &texture);
+      glBindTexture(GL_TEXTURE_2D, texture);
+      glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+      glTexImage2D(GL_TEXTURE_2D, 0, GL_LUMINANCE, glyph.width, glyph.height, 0, GL_LUMINANCE, GL_UNSIGNED_BYTE, glyph.pixels);
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
       assert(0 < glProgram_);
       glUseProgram(glProgram_);
       assert(0 <= location_.texture);
@@ -280,14 +276,12 @@ void Screen::paint() {
 
       left += width;
       switch (character) {
-      case '\t': // HORIZONTAL TAB
+      case L'\t': // HORIZONTAL TAB
         {
           const uint16_t tab = 8 - dimensions_.column % 8;
           dimensions_.column += tab;
         }
         break;
-      case '\n': // NEW LINE
-        goto nextLine;
       default:
         dimensions_.column += 1;
         break;
@@ -303,6 +297,25 @@ nextLine:
   }
 
   swapBuffers();
+}
+
+/* an example as to commit partial rectangles */ 
+void Screen::setCursor(const uint32_t column, const uint32_t line) {
+  const int16_t left = dimensions_.leftPadding + dimensions_.scrollX + (dimensions_.glyphWidth * column);
+  const int16_t top = dimensions_.surfaceHeight
+    - (dimensions_.bottomPadding
+    + (dimensions_.scrollY % dimensions_.lineHeight)
+    + (dimensions_.lineHeight * line));
+
+  glEnable(GL_SCISSOR_TEST);
+  glScissor(left, top, dimensions_.glyphWidth, dimensions_.lineHeight);
+  glClearColor(1.f, 1.f, 1.f, 1.f);
+  glClear(GL_COLOR_BUFFER_BIT);
+  glDisable(GL_SCISSOR_TEST);
+
+  const std::array<Rectangle, 1> rectangle{left, top, dimensions_.glyphWidth, dimensions_.lineHeight};
+
+  surface_->egl().swapBuffers(surface_->egl(), rectangle);
 }
 
 void Screen::repaint() {

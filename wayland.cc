@@ -1,6 +1,8 @@
 #include <array>
 #include <iostream>
 
+#include <cstring>
+
 #include <sys/mman.h>
 
 #include <xkbcommon/xkbcommon-compose.h>
@@ -215,8 +217,9 @@ EGL::~EGL() {
 EGL::EGL(EGL && other) {
   std::swap(context_, other.context_);
   std::swap(display_, other.display_);
-  std::swap(surface_, other.surface_);
+  std::swap(eglSwapBuffersWithDamageKHR_, other.eglSwapBuffersWithDamageKHR_); 
   std::swap(eglWindow_, other.eglWindow_);
+  std::swap(surface_, other.surface_);
 }
 
 EGL & EGL::operator = (EGL && other) {
@@ -355,6 +358,20 @@ EGL Connection::egl() const {
   {
     constexpr EGLAttrib surfaceAttributes[] = { EGL_NONE };
     result.surface_ = eglCreatePlatformWindowSurface(result.display_, configuration, result.eglWindow_, surfaceAttributes);
+  }
+
+  {
+    const char * const queryStringResult = eglQueryString(display_, EGL_EXTENSIONS);
+    std::string extensions;
+    if (nullptr != queryStringResult && 0 < strlen(queryStringResult)) {
+      extensions = queryStringResult;
+    }
+
+    if (extensions.find("EGL_KHR_swap_buffers_with_damage")) {
+        result.eglSwapBuffersWithDamageKHR_ = reinterpret_cast<PFNEGLSWAPBUFFERSWITHDAMAGEEXTPROC>(eglGetProcAddress("eglSwapBuffersWithDamageKHR"));
+    } else {
+      std::cerr << "EGL_KHR_swap_buffers_with_damage is not supported" << std::endl;
+    }
   }
 
   return result;

@@ -111,7 +111,7 @@ std::unique_ptr<Terminal> Terminal::New(Screen * const screen) {
   const char * const TERM = getenv("TERM");
   std::string terminalType;
   if (nullptr != TERM && 0 < strlen(TERM)) {
-    terminalType = getenv("TERM");
+    terminalType = TERM;
   }
 
   std::transform(terminalType.begin(), terminalType.end(), terminalType.begin(),

@@ -52,12 +52,9 @@ struct Screen {
 
   static Screen New(const wayland::Connection &, Font &&);
 
-  Buffer & buffer() { return buffer_; }
-  void clear();
-
   void changeScrollY(const int32_t);
-
   void changeScrollX(const int32_t);
+  void resetScroll() { dimensions_.scrollX = dimensions_.scrollY = 0; }
 
   int32_t getColumns() const { return dimensions_.columns(); }
   int32_t getLines() const { return dimensions_.lines(); }
@@ -65,20 +62,20 @@ struct Screen {
   void decreaseFontSize() { font_.decreaseSize(); dimensions(); }
   void increaseFontSize() { font_.increaseSize(); dimensions(); }
 
-  void makeCurrent() const;
+  void clear();
   void paint();
   void repaint();
-  void resetScroll() { dimensions_.scrollX = dimensions_.scrollY = 0; }
-  bool swapBuffers() const;
   void resize(int32_t, int32_t);
+  void setCursor(const uint32_t, const uint32_t);
   void write() { repaint_ = true; }
-
-  /* how to handle cursor */
-  void setCursor(const uint32_t column, const uint32_t line);
 
   std::function<void (int32_t, int32_t)> onResize;
 
 private:
+  Buffer & buffer() { return buffer_; }
+  void makeCurrent() const { surface_->egl().makeCurrent(); }
+  bool swapBuffers() const { return surface_->egl().swapBuffers(); }
+
   Screen(std::unique_ptr<wayland::Surface> &&, Font &&);
 
   void dimensions();
@@ -101,4 +98,7 @@ private:
     GLint texture = 0;
     GLint vpos = 0;
   } location_;
+
+  friend class Terminal;
+  friend class vt100;
 };

@@ -9,6 +9,7 @@
 #include <wayland-egl.h>
 
 #include <EGL/egl.h>
+// #define EGL_EGLEXT_PROTOTYPES
 #include <EGL/eglext.h>
 
 #include <GLES2/gl2.h>
@@ -41,11 +42,30 @@ struct EGL {
   void makeCurrent() const;
   bool swapBuffers() const;
 
+  template <class CONTAINER>
+  bool swapBuffers(const wayland::EGL & egl, CONTAINER & container) const {
+    assert(nullptr != eglSwapBuffersWithDamageKHR_);
+    assert(nullptr != display_);
+    assert(nullptr != surface_);
+    const EGLBoolean result = eglSwapBuffersWithDamageKHR_(
+        display_, surface_, reinterpret_cast<const int *>(container.data()), container.size());
+    if (EGL_FALSE == result) {
+      std::cerr << "EGL buffer swap failed." << std::endl;
+    }
+    return EGL_TRUE == result;
+  }
+
+  EGLDisplay display() const { return display_; }
+  EGLSurface surface() const { return surface_; }
+
 private:
   EGLContext context_ = nullptr;
   EGLDisplay display_ = nullptr;
   EGLSurface surface_ = nullptr;
   struct wl_egl_window * eglWindow_ = nullptr;
+
+  // EGL Extensions
+  PFNEGLSWAPBUFFERSWITHDAMAGEEXTPROC eglSwapBuffersWithDamageKHR_ = nullptr;
 
   friend class Connection;
 };
