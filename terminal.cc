@@ -24,7 +24,6 @@ Terminal::Terminal(Screen * const screen) : Events(POLLIN | POLLHUP), screen_(sc
 
 /* pollin should:
  *  - be broken into a generic piece towards reuse.
- *  - make use of mbrstowcs to parse multiple characters.
  *  - the parsed characters are then pumped into the caller
  *    for further processing.
  */
@@ -73,7 +72,8 @@ void Terminal::pollin() {
         bufferStart_ = 0;
         break;
       default:
-        screen_->buffer().push_back(Rune{character});
+        // screen_->buffer().push_back(Rune{character});
+        screen_->pushBack(Rune{character});
         iterator += bytes;
         bufferStart_ = 0;
         break;
@@ -93,7 +93,7 @@ void Terminal::pollin() {
     }
 
   }
-  screen_->write();
+  // screen_->write();
 }
 
 void Terminal::pollhup() {

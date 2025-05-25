@@ -6,12 +6,13 @@
 #include "buffer.h"
 #include "font.h"
 #include "freetype.h"
+#include "rune.h"
 #include "wayland.h"
 
 struct Dimensions {
   uint16_t column = 0;
-  uint16_t cursor_left = 10;
-  uint16_t cursor_top = 10;
+  int16_t cursorLeft = 0;
+  int16_t cursorBottom = 0;
   uint16_t glyphAscender = 0;
   int16_t glyphDescender = 0;
   uint16_t lineHeight = 0;
@@ -66,8 +67,8 @@ struct Screen {
   void paint();
   void repaint();
   void resize(int32_t, int32_t);
+  void pushBack(Rune &&);
   void setCursor(const uint32_t, const uint32_t);
-  void write() { repaint_ = true; }
 
   std::function<void (int32_t, int32_t)> onResize;
 
@@ -92,12 +93,7 @@ private:
 
   Dimensions dimensions_;
 
-  struct {
-    GLint background = 0;
-    GLint color = 0;
-    GLint texture = 0;
-    GLint vpos = 0;
-  } location_;
+  std::vector<Rectangle> rectangles_;
 
   friend class Terminal;
   friend class vt100;

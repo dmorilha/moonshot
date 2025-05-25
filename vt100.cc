@@ -58,5 +58,5 @@ void vt100::pollin() {
     std::cout << std::endl;
     length = read(fd_.child, buffer.data(), buffer.size() - 1);
   }
-  screen_->write();
+  // screen_->write();
 }

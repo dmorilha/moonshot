@@ -30,6 +30,12 @@ const float color[3] = { 0.f, 1.f, 0.f, };
 static GLuint vertex_shader = 0;
 static GLuint fragment_shader = 0;
 
+struct {
+  GLint background = 0;
+  GLint color = 0;
+  GLint texture = 0;
+  GLint vpos = 0;
+} location;
 } // end of annonymous namespace
 
 Screen Screen::New(const wayland::Connection & connection, Font && font) {
@@ -60,10 +66,13 @@ Screen Screen::New(const wayland::Connection & connection, Font && font) {
   glAttachShader(result.glProgram_, fragment_shader);
   glLinkProgram(result.glProgram_);
 
-  result.location_.texture = glGetUniformLocation(result.glProgram_, "texture");
-  result.location_.background = glGetUniformLocation(result.glProgram_, "background");
-  result.location_.color = glGetUniformLocation(result.glProgram_, "color");
-  result.location_.vpos = glGetAttribLocation(result.glProgram_, "vPos");
+  location.texture = glGetUniformLocation(result.glProgram_, "texture");
+  location.background = glGetUniformLocation(result.glProgram_, "background");
+  location.color = glGetUniformLocation(result.glProgram_, "color");
+  location.vpos = glGetAttribLocation(result.glProgram_, "vPos");
+
+  glClearColor(background[0], background[1], background[2], 0);
+  glClear(GL_COLOR_BUFFER_BIT);
 
   return result;
 }
@@ -74,8 +83,7 @@ Screen::Screen(std::unique_ptr<wayland::Surface> && surface, Font && font) : sur
 }
 
 void Screen::resize(int32_t width, int32_t height) {
-  dimensions_.surfaceHeight = surface_->height();
-  dimensions_.surfaceWidth = surface_->width();
+  dimensions();
   /* pass the number of columns to the buffer for wrapping purposes */
   if (static_cast<bool>(onResize)) {
     onResize(width, height);
@@ -107,21 +115,17 @@ void Screen::changeScrollX(const int32_t value) {
   }
 }
 
-/* a spot for constant re-evaluation */
-
 /*
- * by evaluating "wayst" source code, it becomes clear that to gain on
- * performace the "screen" has to allow for merges of modified rects.
+ by evaluating "wayst" source code, it becomes clear that to gain on
+ performace the "screen" has to allow for merges of modified rects.
  */
+
+/* a spot for constant re-evaluation */
 void Screen::paint() {
-  glViewport(0, 0, dimensions_.surfaceWidth, dimensions_.surfaceHeight);
+  dimensions();
+
   glClearColor(background[0], background[1], background[2], 0);
   glClear(GL_COLOR_BUFFER_BIT);
-
-  int16_t left = dimensions_.leftPadding + dimensions_.scrollX;
-  int16_t bottom = dimensions_.bottomPadding + (dimensions_.scrollY % dimensions_.lineHeight) + dimensions_.lineHeight * std::max(static_cast<int>(dimensions_.lines() - buffer_.lines()), 0);
-  dimensions_.column = 0;
-  dimensions_.line = 0;
 
   uint16_t remainingLines = dimensions_.lines() + 2;
   uint16_t skip = std::abs(dimensions_.scrollY);
@@ -147,36 +151,12 @@ void Screen::paint() {
           const std::size_t tab = 8 - dimensions_.column % 8;
           width *= tab;
         }
-        // DISPLAY
         rune.character = L' ';
-        rune.hasBackgroundColor = true;
-        rune.backgroundColor.red = 0.0f;
-        rune.backgroundColor.green = 0.4f;
-        rune.backgroundColor.blue = 0.f;
-        rune.backgroundColor.alpha = 1.f;
         break;
       case L'\r': // CARRIAGE RETURN
         continue;
-        break;
       case L'\n': // NEW LINE
-#if DEBUG
-        // DISPLAY
-        rune.character = L'$';
-        rune.style = rune.ITALIC;
-        rune.hasBackgroundColor = true;
-        rune.backgroundColor.red = 0.0f;
-        rune.backgroundColor.green = 0.4f;
-        rune.backgroundColor.blue = 0.f;
-        rune.backgroundColor.alpha = 1.f;
-        rune.hasForegroundColor = true;
-        rune.foregroundColor.red = 0.f;
-        rune.foregroundColor.green = 0.f;
-        rune.foregroundColor.blue = 0.f;
-        rune.foregroundColor.alpha = 1.f;
-#else
         goto nextLine;
-#endif
-        break;
       default:
         break;
       }
@@ -202,7 +182,7 @@ void Screen::paint() {
 
       // background
       glEnable(GL_SCISSOR_TEST);
-      glScissor(left, bottom, width, dimensions_.lineHeight);
+      glScissor(dimensions_.cursorLeft, dimensions_.cursorBottom, width, dimensions_.lineHeight);
       if (rune.hasBackgroundColor) {
         glClearColor(rune.backgroundColor.red, rune.backgroundColor.green, rune.backgroundColor.blue, rune.backgroundColor.alpha); 
       } else {
@@ -217,10 +197,10 @@ void Screen::paint() {
       #endif
 
       // vertices
-      const float vertex_bottom = -1.f + dimensions_.scaleHeight() * (bottom + glyph.top - (dimensions_.glyphDescender + glyph.height));
-      const float vertex_left = -1.f + dimensions_.scaleWidth() * (left + glyph.left);
-      const float vertex_right = -1.f + dimensions_.scaleWidth() * (left + glyph.left + glyph.width);
-      const float vertex_top = -1.f + dimensions_.scaleHeight() * (bottom + glyph.top - dimensions_.glyphDescender);
+      const float vertex_bottom = -1.f + dimensions_.scaleHeight() * (dimensions_.cursorBottom + glyph.top - (dimensions_.glyphDescender + glyph.height));
+      const float vertex_left = -1.f + dimensions_.scaleWidth() * (dimensions_.cursorLeft + glyph.left);
+      const float vertex_right = -1.f + dimensions_.scaleWidth() * (dimensions_.cursorLeft + glyph.left + glyph.width);
+      const float vertex_top = -1.f + dimensions_.scaleHeight() * (dimensions_.cursorBottom + glyph.top - dimensions_.glyphDescender);
 
       const float vertices[4][4] = {
         // vertex a - left top
@@ -247,34 +227,34 @@ void Screen::paint() {
       glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
       assert(0 < glProgram_);
       glUseProgram(glProgram_);
-      assert(0 <= location_.texture);
-      glUniform1i(location_.texture, 0);
+      assert(0 <= location.texture);
+      glUniform1i(location.texture, 0);
 
-      assert(0 <= location_.background);
+      assert(0 <= location.background);
       if (rune.hasBackgroundColor) {
-        glUniform3fv(location_.background, 1, rune.backgroundColor);
+        glUniform3fv(location.background, 1, rune.backgroundColor);
       } else {
-        glUniform3fv(location_.background, 1, background);
+        glUniform3fv(location.background, 1, background);
       }
 
-      assert(0 <= location_.color);
+      assert(0 <= location.color);
       if (rune.hasForegroundColor) {
-        glUniform3fv(location_.color, 1, rune.foregroundColor);
+        glUniform3fv(location.color, 1, rune.foregroundColor);
       } else {
-        glUniform3fv(location_.color, 1, color);
+        glUniform3fv(location.color, 1, color);
       }
 
       glBindBuffer(GL_ARRAY_BUFFER, vertex_buffer);
-      assert(0 <= location_.vpos);
-      glEnableVertexAttribArray(location_.vpos);
-      glVertexAttribPointer(location_.vpos, 4, GL_FLOAT, GL_FALSE, sizeof(vertices[0]), nullptr);
+      assert(0 <= location.vpos);
+      glEnableVertexAttribArray(location.vpos);
+      glVertexAttribPointer(location.vpos, 4, GL_FLOAT, GL_FALSE, sizeof(vertices[0]), nullptr);
       glBindBuffer(GL_ARRAY_BUFFER, vertex_buffer);
 
       glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
       glDeleteBuffers(1, &vertex_buffer);
       glDeleteTextures(1, &texture);
 
-      left += width;
+      dimensions_.cursorLeft += width;
       switch (character) {
       case L'\t': // HORIZONTAL TAB
         {
@@ -289,8 +269,8 @@ void Screen::paint() {
     }
 
 nextLine:
-    bottom += dimensions_.lineHeight;
-    left = dimensions_.leftPadding + dimensions_.scrollX;
+    dimensions_.cursorBottom += dimensions_.lineHeight;
+    dimensions_.cursorLeft = dimensions_.leftPadding + dimensions_.scrollX;
     dimensions_.column = 0;
     dimensions_.line -= 1;
     remainingLines--;
@@ -299,7 +279,107 @@ nextLine:
   swapBuffers();
 }
 
-/* an example as to commit partial rectangles */ 
+void Screen::pushBack(Rune && rune) {
+  std::cout << __func__ << std::endl;
+  const char character = rune.character;
+  uint16_t width = dimensions_.glyphWidth; // that forces it to be monospaced.
+  switch (character) {
+  case L'\t': // HORIZONTAL TAB
+    {
+      const std::size_t tab = 8 - dimensions_.column % 8;
+      width *= tab;
+    }
+    rune.character = L' ';
+    break;
+  case L'\r': // CARRIAGE RETURN
+    dimensions_.cursorLeft = dimensions_.leftPadding + dimensions_.scrollX;
+    dimensions_.column = 0;
+    return;
+  case L'\n': // NEW LINE
+    dimensions_.cursorBottom -= dimensions_.lineHeight;
+    dimensions_.line += 1;
+    return;
+  default:
+    break;
+  }
+
+  rectangles_.emplace_back(Rectangle{dimensions_.cursorLeft, dimensions_.cursorBottom, width, dimensions_.lineHeight});
+
+  freetype::Glyph glyph;
+  glyph = font_.regular().glyph(rune.character);
+
+  #if 0
+  // background
+  glEnable(GL_SCISSOR_TEST);
+  glScissor(dimensions_.cursorLeft, dimensions_.cursorBottom, width, dimensions_.lineHeight);
+  glClearColor(background[0], background[1], background[2], 1);
+  glClear(GL_COLOR_BUFFER_BIT);
+  glDisable(GL_SCISSOR_TEST);
+  #endif
+
+  // vertices
+  GLuint vertex_buffer = 0;
+  const float vertex_bottom = -1.f + dimensions_.scaleHeight() * (dimensions_.cursorBottom + glyph.top - (dimensions_.glyphDescender + glyph.height));
+  const float vertex_left = -1.f + dimensions_.scaleWidth() * (dimensions_.cursorLeft + glyph.left);
+  const float vertex_right = -1.f + dimensions_.scaleWidth() * (dimensions_.cursorLeft + glyph.left + glyph.width);
+  const float vertex_top = -1.f + dimensions_.scaleHeight() * (dimensions_.cursorBottom + glyph.top - dimensions_.glyphDescender);
+
+  const float vertices[4][4] = {
+    // vertex a - left top
+    { vertex_left, vertex_top, 0, 0, },
+    // vertex b - right top
+    { vertex_right, vertex_top, 1, 0, },
+    // vertex c - right bottom
+    { vertex_right, vertex_bottom, 1, 1, },
+    // vertex d - left bottom
+    { vertex_left, vertex_bottom, 0, 1, },
+  }; 
+
+  glGenBuffers(1, &vertex_buffer);
+  glBindBuffer(GL_ARRAY_BUFFER, vertex_buffer);
+  glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
+
+  // texture
+  GLuint texture = 0;
+  glGenTextures(1, &texture);
+  glBindTexture(GL_TEXTURE_2D, texture);
+  glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+  glTexImage2D(GL_TEXTURE_2D, 0, GL_LUMINANCE, glyph.width, glyph.height, 0, GL_LUMINANCE, GL_UNSIGNED_BYTE, glyph.pixels);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+  assert(0 < glProgram_);
+  glUseProgram(glProgram_);
+  assert(0 <= location.texture);
+  glUniform1i(location.texture, 0);
+
+  assert(0 <= location.background);
+  glUniform3fv(location.background, 1, background);
+
+  assert(0 <= location.color);
+  glUniform3fv(location.color, 1, color);
+
+  glBindBuffer(GL_ARRAY_BUFFER, vertex_buffer);
+  assert(0 <= location.vpos);
+  glEnableVertexAttribArray(location.vpos);
+  glVertexAttribPointer(location.vpos, 4, GL_FLOAT, GL_FALSE, sizeof(vertices[0]), nullptr);
+  glBindBuffer(GL_ARRAY_BUFFER, vertex_buffer);
+
+  glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
+  glDeleteBuffers(1, &vertex_buffer);
+  glDeleteTextures(1, &texture);
+
+  dimensions_.cursorLeft += width;
+  switch (character) {
+  case L'\t': // HORIZONTAL TAB
+    dimensions_.column += 8 - dimensions_.column % 8;
+    break;
+  default:
+    dimensions_.column += 1;
+    break;
+  }
+  repaint_ = true;
+}
+
 void Screen::setCursor(const uint32_t column, const uint32_t line) {
   const int16_t left = dimensions_.leftPadding + dimensions_.scrollX + (dimensions_.glyphWidth * column);
   const int16_t top = dimensions_.surfaceHeight
@@ -319,8 +399,10 @@ void Screen::setCursor(const uint32_t column, const uint32_t line) {
 }
 
 void Screen::repaint() {
+  std::cout << __func__ << std::endl;
   if (repaint_) {
-    paint();
+    surface_->egl().swapBuffers(surface_->egl(), rectangles_);
+    rectangles_.clear();
     repaint_ = false;
   }
 }
@@ -333,25 +415,31 @@ void Screen::dimensions() {
   dimensions_.glyphWidth = face.glyphWidth();
   dimensions_.surfaceHeight = surface_->height();
   dimensions_.surfaceWidth = surface_->width();
-  repaint_ = true;
+  dimensions_.column = 0;
+  dimensions_.line = buffer_.lines();
+  dimensions_.cursorBottom = dimensions_.bottomPadding + (dimensions_.scrollY % dimensions_.lineHeight) + dimensions_.lineHeight * std::max(static_cast<int>(dimensions_.lines() - buffer_.lines()), 0);
+  dimensions_.cursorLeft = dimensions_.leftPadding + dimensions_.scrollX;
+  glViewport(0, 0, dimensions_.surfaceWidth, dimensions_.surfaceHeight);
 }
 
 std::ostream & operator << (std::ostream & o, const Dimensions & d) {
-  o << "column " << d.column
+  o << "bottomPadding " << d.bottomPadding
+    << ", column " << d.column
     << ", columns " << d.columns()
-    << ", cursor_left " << d.cursor_left
-    << ", cursor_top " << d.cursor_top
+    << ", cursorBottom " << d.cursorBottom
+    << ", cursorLeft " << d.cursorLeft
     << ", glyphAscender " << d.glyphAscender
     << ", glyphDescender " << d.glyphDescender
-    << ", lineHeight " << d.lineHeight
     << ", glyphWidth " << d.glyphWidth
     << ", leftPadding " << d.leftPadding
     << ", line " << d.line
+    << ", lineHeight " << d.lineHeight
     << ", lines " << d.lines()
     << ", scaleHeight " << d.scaleHeight()
     << ", scaleWidth " << d.scaleWidth()
+    << ", scrollX " << d.scrollX
+    << ", scrollY " << d.scrollY
     << ", surfaceHeight " << d.surfaceHeight
-    << ", surfaceWidth " << d.surfaceWidth
-    << ", bottomPadding " << d.bottomPadding;
+    << ", surfaceWidth " << d.surfaceWidth;
   return o;
 }
