@@ -38,6 +38,7 @@ struct {
 } location;
 } // end of annonymous namespace
 
+/* should it be a singleton ? */
 Screen Screen::New(const wayland::Connection & connection, Font && font) {
   auto egl = connection.egl();
   std::unique_ptr<wayland::Surface> surface = connection.surface(std::move(egl));
@@ -45,7 +46,6 @@ Screen Screen::New(const wayland::Connection & connection, Font && font) {
   surface->setTitle("Terminal");
 
   Screen result(std::move(surface), std::move(font));
-  result.dimensions();
 
   result.makeCurrent();
   result.swapBuffers();
@@ -71,8 +71,11 @@ Screen Screen::New(const wayland::Connection & connection, Font && font) {
   location.color = glGetUniformLocation(result.glProgram_, "color");
   location.vpos = glGetAttribLocation(result.glProgram_, "vPos");
 
-  glClearColor(background[0], background[1], background[2], 0);
-  glClear(GL_COLOR_BUFFER_BIT);
+  result.dimensions();
+  result.dimensions_.cursorBottom = (result.dimensions_.scrollY % result.dimensions_.lineHeight) + result.dimensions_.lineHeight * result.dimensions_.lines();
+  result.dimensions_.cursorLeft = result.dimensions_.leftPadding + result.dimensions_.scrollX;
+
+  result.paint();
 
   return result;
 }
@@ -103,7 +106,8 @@ void Screen::changeScrollY(const int32_t value) {
   if (scrollY != dimensions_.scrollY
       && dimensions_.lines() < buffer_.lines() + 1 + (scrollY / dimensions_.lineHeight)) {
     dimensions_.scrollY = scrollY;
-    repaint_ = true;
+    dimensions_.cursorBottom = dimensions_.bottomPadding + (dimensions_.scrollY % dimensions_.lineHeight) + dimensions_.lineHeight * std::max(static_cast<int>(dimensions_.lines() - buffer_.lines()), 0);
+    repaint_ = repaintFull_ = true;
   }
 }
 
@@ -111,7 +115,8 @@ void Screen::changeScrollX(const int32_t value) {
   const int16_t scrollX = std::min(dimensions_.scrollX + value * 2, 0);
   if (scrollX != dimensions_.scrollX) {
     dimensions_.scrollX = scrollX;
-    repaint_ = true;
+    dimensions_.cursorLeft = dimensions_.leftPadding + dimensions_.scrollX;
+    repaint_ = repaintFull_ = true;
   }
 }
 
@@ -122,13 +127,119 @@ void Screen::changeScrollX(const int32_t value) {
 
 /* a spot for constant re-evaluation */
 void Screen::paint() {
-  dimensions();
+  glViewport(0, 0, dimensions_.surfaceWidth, dimensions_.surfaceHeight);
 
+  /* difference */
+  const auto difference = buffer_.difference();
+  if ( ! repaintFull_ && ! difference.empty()) {
+    for (auto print : difference) {
+      uint16_t width = dimensions_.glyphWidth; // that forces it to be monospaced.
+      uint8_t tab = 1;
+      if (print.iscontrol()) {
+        switch (print.character) {
+        case L'\t': // HORIZONTAL TAB
+          tab = 8 - dimensions_.column % 8;
+          width *= tab;
+          print.character = L' ';
+          break;
+        case L'\r': // CARRIAGE RETURN
+          dimensions_.column = 0;
+          dimensions_.cursorLeft = dimensions_.leftPadding;
+          continue;
+        case L'\n': // NEW LINE
+          ++dimensions_.line;
+          dimensions_.cursorBottom -= dimensions_.lineHeight;
+          if (dimensions_.lineHeight > dimensions_.cursorBottom) {
+            goto repaintFull;
+          }
+          continue;
+        default:
+          break;
+        }
+      }
+
+      rectangles_.emplace_back(Rectangle{dimensions_.cursorLeft, dimensions_.cursorBottom, width, dimensions_.lineHeight});
+
+      freetype::Glyph glyph;
+      glyph = font_.regular().glyph(print.character);
+
+      // background
+      glEnable(GL_SCISSOR_TEST);
+      glScissor(dimensions_.cursorLeft, dimensions_.cursorBottom, width, dimensions_.lineHeight);
+      glClearColor(background[0], background[1], background[2], 1);
+      glClear(GL_COLOR_BUFFER_BIT);
+      glDisable(GL_SCISSOR_TEST);
+
+      // vertices
+      GLuint vertex_buffer = 0;
+      const float vertex_bottom = -1.f + dimensions_.scaleHeight() * (dimensions_.cursorBottom + glyph.top - (dimensions_.glyphDescender + glyph.height));
+      const float vertex_left = -1.f + dimensions_.scaleWidth() * (dimensions_.cursorLeft + glyph.left);
+      const float vertex_right = -1.f + dimensions_.scaleWidth() * (dimensions_.cursorLeft + glyph.left + glyph.width);
+      const float vertex_top = -1.f + dimensions_.scaleHeight() * (dimensions_.cursorBottom + glyph.top - dimensions_.glyphDescender);
+
+      const float vertices[4][4] = {
+        // vertex a - left top
+        { vertex_left, vertex_top, 0, 0, },
+        // vertex b - right top
+        { vertex_right, vertex_top, 1, 0, },
+        // vertex c - right bottom
+        { vertex_right, vertex_bottom, 1, 1, },
+        // vertex d - left bottom
+        { vertex_left, vertex_bottom, 0, 1, },
+      }; 
+
+      glGenBuffers(1, &vertex_buffer);
+      glBindBuffer(GL_ARRAY_BUFFER, vertex_buffer);
+      glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
+
+      // texture
+      GLuint texture = 0;
+      glGenTextures(1, &texture);
+      glBindTexture(GL_TEXTURE_2D, texture);
+      glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+      glTexImage2D(GL_TEXTURE_2D, 0, GL_LUMINANCE, glyph.width, glyph.height, 0, GL_LUMINANCE, GL_UNSIGNED_BYTE, glyph.pixels);
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+      assert(0 < glProgram_);
+      glUseProgram(glProgram_);
+      assert(0 <= location.texture);
+      glUniform1i(location.texture, 0);
+
+      assert(0 <= location.background);
+      glUniform3fv(location.background, 1, background);
+
+      assert(0 <= location.color);
+      glUniform3fv(location.color, 1, color);
+
+      glBindBuffer(GL_ARRAY_BUFFER, vertex_buffer);
+      assert(0 <= location.vpos);
+      glEnableVertexAttribArray(location.vpos);
+      glVertexAttribPointer(location.vpos, 4, GL_FLOAT, GL_FALSE, sizeof(vertices[0]), nullptr);
+      glBindBuffer(GL_ARRAY_BUFFER, vertex_buffer);
+
+      glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
+      glDeleteBuffers(1, &vertex_buffer);
+      glDeleteTextures(1, &texture);
+
+      dimensions_.cursorLeft += width;
+      dimensions_.column += tab;
+    }
+    return;
+  }
+
+  /* no difference, full repaint */
+repaintFull:
+  rectangles_.clear();
+  repaintFull_ = true;
   glClearColor(background[0], background[1], background[2], 0);
   glClear(GL_COLOR_BUFFER_BIT);
-
+  int16_t cursorBottom = dimensions_.cursorBottom = dimensions_.bottomPadding + (dimensions_.scrollY % dimensions_.lineHeight) + dimensions_.lineHeight * std::max(static_cast<int>(dimensions_.lines() - buffer_.lines()), 0);
+  int16_t cursorLeft = dimensions_.leftPadding;
+  uint16_t column = dimensions_.column;
+  uint16_t line = dimensions_.line;
   uint16_t remainingLines = dimensions_.lines() + 2;
   uint16_t skip = std::abs(dimensions_.scrollY);
+  bool firstLine = true;
   const auto END = buffer_.rend();
   for (auto iterator = buffer_.rbegin(); END != iterator; ++iterator) {
     if (0 == remainingLines) {
@@ -148,7 +259,7 @@ void Screen::paint() {
       switch (character) {
       case L'\t': // HORIZONTAL TAB
         {
-          const std::size_t tab = 8 - dimensions_.column % 8;
+          const std::size_t tab = 8 - column % 8;
           width *= tab;
         }
         rune.character = L' ';
@@ -182,7 +293,7 @@ void Screen::paint() {
 
       // background
       glEnable(GL_SCISSOR_TEST);
-      glScissor(dimensions_.cursorLeft, dimensions_.cursorBottom, width, dimensions_.lineHeight);
+      glScissor(cursorLeft, cursorBottom, width, dimensions_.lineHeight);
       if (rune.hasBackgroundColor) {
         glClearColor(rune.backgroundColor.red, rune.backgroundColor.green, rune.backgroundColor.blue, rune.backgroundColor.alpha); 
       } else {
@@ -197,10 +308,10 @@ void Screen::paint() {
       #endif
 
       // vertices
-      const float vertex_bottom = -1.f + dimensions_.scaleHeight() * (dimensions_.cursorBottom + glyph.top - (dimensions_.glyphDescender + glyph.height));
-      const float vertex_left = -1.f + dimensions_.scaleWidth() * (dimensions_.cursorLeft + glyph.left);
-      const float vertex_right = -1.f + dimensions_.scaleWidth() * (dimensions_.cursorLeft + glyph.left + glyph.width);
-      const float vertex_top = -1.f + dimensions_.scaleHeight() * (dimensions_.cursorBottom + glyph.top - dimensions_.glyphDescender);
+      const float vertex_bottom = -1.f + dimensions_.scaleHeight() * (cursorBottom + glyph.top - (dimensions_.glyphDescender + glyph.height));
+      const float vertex_left = -1.f + dimensions_.scaleWidth() * (cursorLeft + glyph.left);
+      const float vertex_right = -1.f + dimensions_.scaleWidth() * (cursorLeft + glyph.left + glyph.width);
+      const float vertex_top = -1.f + dimensions_.scaleHeight() * (cursorBottom + glyph.top - dimensions_.glyphDescender);
 
       const float vertices[4][4] = {
         // vertex a - left top
@@ -254,156 +365,57 @@ void Screen::paint() {
       glDeleteBuffers(1, &vertex_buffer);
       glDeleteTextures(1, &texture);
 
-      dimensions_.cursorLeft += width;
+      cursorLeft += width;
       switch (character) {
       case L'\t': // HORIZONTAL TAB
         {
-          const uint16_t tab = 8 - dimensions_.column % 8;
-          dimensions_.column += tab;
+          const uint16_t tab = 8 - column % 8;
+          column += tab;
         }
         break;
       default:
-        dimensions_.column += 1;
+        column += 1;
         break;
       }
     }
 
 nextLine:
-    dimensions_.cursorBottom += dimensions_.lineHeight;
-    dimensions_.cursorLeft = dimensions_.leftPadding + dimensions_.scrollX;
-    dimensions_.column = 0;
-    dimensions_.line -= 1;
+    if (firstLine) {
+      dimensions_.cursorLeft = cursorLeft;
+      firstLine = false;
+    }
+    cursorBottom += dimensions_.lineHeight;
+    cursorLeft = dimensions_.leftPadding + dimensions_.scrollX;
+    column = 0;
+    line -= 1;
     remainingLines--;
   }
-
-  swapBuffers();
 }
 
 void Screen::pushBack(Rune && rune) {
-  std::cout << __func__ << std::endl;
-  const char character = rune.character;
-  uint16_t width = dimensions_.glyphWidth; // that forces it to be monospaced.
-  switch (character) {
-  case L'\t': // HORIZONTAL TAB
-    {
-      const std::size_t tab = 8 - dimensions_.column % 8;
-      width *= tab;
-    }
-    rune.character = L' ';
-    break;
-  case L'\r': // CARRIAGE RETURN
-    dimensions_.cursorLeft = dimensions_.leftPadding + dimensions_.scrollX;
-    dimensions_.column = 0;
-    return;
-  case L'\n': // NEW LINE
-    dimensions_.cursorBottom -= dimensions_.lineHeight;
-    dimensions_.line += 1;
-    return;
-  default:
-    break;
-  }
-
-  rectangles_.emplace_back(Rectangle{dimensions_.cursorLeft, dimensions_.cursorBottom, width, dimensions_.lineHeight});
-
-  freetype::Glyph glyph;
-  glyph = font_.regular().glyph(rune.character);
-
-  #if 0
-  // background
-  glEnable(GL_SCISSOR_TEST);
-  glScissor(dimensions_.cursorLeft, dimensions_.cursorBottom, width, dimensions_.lineHeight);
-  glClearColor(background[0], background[1], background[2], 1);
-  glClear(GL_COLOR_BUFFER_BIT);
-  glDisable(GL_SCISSOR_TEST);
-  #endif
-
-  // vertices
-  GLuint vertex_buffer = 0;
-  const float vertex_bottom = -1.f + dimensions_.scaleHeight() * (dimensions_.cursorBottom + glyph.top - (dimensions_.glyphDescender + glyph.height));
-  const float vertex_left = -1.f + dimensions_.scaleWidth() * (dimensions_.cursorLeft + glyph.left);
-  const float vertex_right = -1.f + dimensions_.scaleWidth() * (dimensions_.cursorLeft + glyph.left + glyph.width);
-  const float vertex_top = -1.f + dimensions_.scaleHeight() * (dimensions_.cursorBottom + glyph.top - dimensions_.glyphDescender);
-
-  const float vertices[4][4] = {
-    // vertex a - left top
-    { vertex_left, vertex_top, 0, 0, },
-    // vertex b - right top
-    { vertex_right, vertex_top, 1, 0, },
-    // vertex c - right bottom
-    { vertex_right, vertex_bottom, 1, 1, },
-    // vertex d - left bottom
-    { vertex_left, vertex_bottom, 0, 1, },
-  }; 
-
-  glGenBuffers(1, &vertex_buffer);
-  glBindBuffer(GL_ARRAY_BUFFER, vertex_buffer);
-  glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
-
-  // texture
-  GLuint texture = 0;
-  glGenTextures(1, &texture);
-  glBindTexture(GL_TEXTURE_2D, texture);
-  glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
-  glTexImage2D(GL_TEXTURE_2D, 0, GL_LUMINANCE, glyph.width, glyph.height, 0, GL_LUMINANCE, GL_UNSIGNED_BYTE, glyph.pixels);
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-  assert(0 < glProgram_);
-  glUseProgram(glProgram_);
-  assert(0 <= location.texture);
-  glUniform1i(location.texture, 0);
-
-  assert(0 <= location.background);
-  glUniform3fv(location.background, 1, background);
-
-  assert(0 <= location.color);
-  glUniform3fv(location.color, 1, color);
-
-  glBindBuffer(GL_ARRAY_BUFFER, vertex_buffer);
-  assert(0 <= location.vpos);
-  glEnableVertexAttribArray(location.vpos);
-  glVertexAttribPointer(location.vpos, 4, GL_FLOAT, GL_FALSE, sizeof(vertices[0]), nullptr);
-  glBindBuffer(GL_ARRAY_BUFFER, vertex_buffer);
-
-  glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
-  glDeleteBuffers(1, &vertex_buffer);
-  glDeleteTextures(1, &texture);
-
-  dimensions_.cursorLeft += width;
-  switch (character) {
-  case L'\t': // HORIZONTAL TAB
-    dimensions_.column += 8 - dimensions_.column % 8;
-    break;
-  default:
-    dimensions_.column += 1;
-    break;
-  }
+  buffer_.pushBack(std::move(rune));
   repaint_ = true;
 }
 
-void Screen::setCursor(const uint32_t column, const uint32_t line) {
-  const int16_t left = dimensions_.leftPadding + dimensions_.scrollX + (dimensions_.glyphWidth * column);
-  const int16_t top = dimensions_.surfaceHeight
-    - (dimensions_.bottomPadding
-    + (dimensions_.scrollY % dimensions_.lineHeight)
-    + (dimensions_.lineHeight * line));
-
-  glEnable(GL_SCISSOR_TEST);
-  glScissor(left, top, dimensions_.glyphWidth, dimensions_.lineHeight);
-  glClearColor(1.f, 1.f, 1.f, 1.f);
-  glClear(GL_COLOR_BUFFER_BIT);
-  glDisable(GL_SCISSOR_TEST);
-
-  const std::array<Rectangle, 1> rectangle{left, top, dimensions_.glyphWidth, dimensions_.lineHeight};
-
-  surface_->egl().swapBuffers(surface_->egl(), rectangle);
-}
-
 void Screen::repaint() {
-  std::cout << __func__ << std::endl;
   if (repaint_) {
-    surface_->egl().swapBuffers(surface_->egl(), rectangles_);
-    rectangles_.clear();
     repaint_ = false;
+    paint();
+    if ( ! repaintFull_ || ! rectangles_.empty()) {
+      // std::cout << "*" << std::flush;
+      std::vector<Rectangle> rectangles;
+      for (auto && item : rectangles_) {
+        rectangles.emplace_back(std::move(item));
+      }
+      surface_->egl().swapBuffers(rectangles);
+    } else {
+      // std::cout << "-" << std::flush;
+      repaintFull_ = false;
+      surface_->egl().swapBuffers();
+    }
+    rectangles_.clear();
+  } else {
+    // std::cout << "!" << std::flush;
   }
 }
 
@@ -415,11 +427,6 @@ void Screen::dimensions() {
   dimensions_.glyphWidth = face.glyphWidth();
   dimensions_.surfaceHeight = surface_->height();
   dimensions_.surfaceWidth = surface_->width();
-  dimensions_.column = 0;
-  dimensions_.line = buffer_.lines();
-  dimensions_.cursorBottom = dimensions_.bottomPadding + (dimensions_.scrollY % dimensions_.lineHeight) + dimensions_.lineHeight * std::max(static_cast<int>(dimensions_.lines() - buffer_.lines()), 0);
-  dimensions_.cursorLeft = dimensions_.leftPadding + dimensions_.scrollX;
-  glViewport(0, 0, dimensions_.surfaceWidth, dimensions_.surfaceHeight);
 }
 
 std::ostream & operator << (std::ostream & o, const Dimensions & d) {

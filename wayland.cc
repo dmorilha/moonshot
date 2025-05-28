@@ -193,63 +193,99 @@ constexpr static struct wl_keyboard_listener KeyboardListener{
     int32_t rate,
     int32_t delay) { /* UNIMPLEMENTED */ }},
 };
+
+constexpr static struct wl_callback_listener frame_listener = {
+  .done{[](void * data,
+    struct wl_callback * callback,
+    uint32_t time) {
+      EGL * const egl = static_cast<EGL *>(data);
+      assert(nullptr != egl);
+      egl->frameCallback();
+    }},
+};
 }
 
 EGL::~EGL() {
-  if (nullptr != eglWindow_) {
-    wl_egl_window_destroy(eglWindow_);
-    eglWindow_ = nullptr;
+  if (nullptr != window_) {
+    wl_egl_window_destroy(window_);
+    window_ = nullptr;
   }
 
-  if (nullptr != surface_) {
-    assert(nullptr != display_);
-    eglDestroySurface(display_, surface_);
-    surface_ = nullptr;
+  if (nullptr != eglSurface_) {
+    assert(nullptr != eglDisplay_);
+    eglDestroySurface(eglDisplay_, eglSurface_);
+    eglSurface_ = nullptr;
   }
 
-  if (nullptr != context_) {
-    assert(nullptr != display_);
-    eglDestroyContext(display_, context_);
-    context_ = nullptr;
+  if (nullptr != eglContext_) {
+    assert(nullptr != eglDisplay_);
+    eglDestroyContext(eglDisplay_, eglContext_);
+    eglContext_ = nullptr;
+  }
+
+  if (nullptr != frameCallback_) {
+    wl_callback_destroy(frameCallback_);
+    frameCallback_ = nullptr;
   }
 }
 
 EGL::EGL(EGL && other) {
-  std::swap(context_, other.context_);
-  std::swap(display_, other.display_);
-  std::swap(eglSwapBuffersWithDamageKHR_, other.eglSwapBuffersWithDamageKHR_); 
-  std::swap(eglWindow_, other.eglWindow_);
-  std::swap(surface_, other.surface_);
+  operator = (std::move(other));
 }
 
 EGL & EGL::operator = (EGL && other) {
-  std::swap(context_, other.context_);
-  std::swap(display_, other.display_);
+  std::swap(window_, other.window_);
   std::swap(surface_, other.surface_);
-  std::swap(eglWindow_, other.eglWindow_);
+  std::swap(eglContext_, other.eglContext_);
+  std::swap(eglDisplay_, other.eglDisplay_);
+  std::swap(eglSurface_, other.eglSurface_);
+  std::swap(eglSwapBuffersWithDamageKHR_, other.eglSwapBuffersWithDamageKHR_); 
+  if (nullptr != other.frameCallback_) {
+    wl_callback_destroy(other.frameCallback_);
+    other.frameCallback_ = nullptr;
+    setupFrameCallback();
+  }
+  std::swap(drawNextFrame_, other.drawNextFrame_); 
   return *this;
 }
 
 void EGL::resize(std::size_t width, std::size_t height) {
-  assert(nullptr != eglWindow_);
-  return wl_egl_window_resize(eglWindow_, width, height, 0, 0);
+  assert(nullptr != window_);
+  return wl_egl_window_resize(window_, width, height, 0, 0);
 }
 
 void EGL::makeCurrent() const {
-  assert(nullptr != context_);
-  assert(nullptr != display_);
-  assert(nullptr != surface_);
-  const auto r = eglMakeCurrent(display_, surface_, surface_, context_);
+  assert(nullptr != eglContext_);
+  assert(nullptr != eglDisplay_);
+  assert(nullptr != eglSurface_);
+  const auto r = eglMakeCurrent(eglDisplay_, eglSurface_, eglSurface_, eglContext_);
 }
 
-bool EGL::swapBuffers() const {
-  assert(nullptr != display_);
-  assert(nullptr != surface_);
-  const EGLBoolean result = eglSwapBuffers(display_, surface_);
+bool EGL::swapBuffers(const bool force) const {
+  assert(nullptr != eglDisplay_);
+  assert(nullptr != eglSurface_);
+  if ( ! (drawNextFrame_ || force)) {
+    return true;
+  }
+  drawNextFrame_ = false;
+
+  const EGLBoolean result = eglSwapBuffers(eglDisplay_, eglSurface_);
   if (EGL_FALSE == result) {
     std::cerr << "EGL buffer swap failed." << std::endl;
+    return false;
   }
-  return EGL_TRUE == result;
+  setupFrameCallback();
+  return true;
+}
+
+void EGL::setupFrameCallback() const {
+  if (nullptr == frameCallback_) {
+    assert(nullptr != surface_);
+    frameCallback_ = wl_surface_frame(surface_);
+    assert(nullptr != frameCallback_);
+    wl_callback_add_listener(frameCallback_, &frame_listener, const_cast<EGL*>(this));
+    drawNextFrame_ = true;
+  }
 }
 
 Surface::Surface(Surface && other) :
@@ -283,6 +319,9 @@ void Surface::onToplevelConfigure(struct xdg_toplevel *, const int32_t width, co
 void Connection::outputMode(struct wl_output * output, uint32_t flags, int32_t width, int32_t height, int32_t refresh) {
   outputMode_.height = std::max(0, height);
   outputMode_.width = std::max(0, width);
+  if (flags & WL_OUTPUT_MODE_CURRENT) {
+    std::cout << "refresh " << refresh << " " << (1000000 / refresh) << std::endl;
+  }
 }
 
 void Connection::capabilities() {
@@ -312,10 +351,10 @@ EGL Connection::egl() const {
   EGL result;
 
   assert(nullptr != display_);
-  result.display_ = eglGetDisplay(display_);
+  result.eglDisplay_ = eglGetDisplay(display_);
 
   EGLint major, minor;
-  if (EGL_TRUE != eglInitialize(result.display_, &major, &minor)) {
+  if (EGL_TRUE != eglInitialize(result.eglDisplay_, &major, &minor)) {
     std::cerr << "EGL initialization error." << std::endl;
   }
 
@@ -331,7 +370,7 @@ EGL Connection::egl() const {
     EGL_ALPHA_SIZE, 8,
     EGL_NONE };
 
-  eglChooseConfig(result.display_, attributes, &configuration, 1, &number_config);
+  eglChooseConfig(result.eglDisplay_, attributes, &configuration, 1, &number_config);
 
   if (EGL_TRUE != eglBindAPI(EGL_OPENGL_API)) {
     std::cerr << "EGL API binding error " << eglGetError() << std::endl;
@@ -346,18 +385,19 @@ EGL Connection::egl() const {
       EGL_NONE,
     };
 
-    result.context_ = eglCreateContext(result.display_, configuration, EGL_NO_CONTEXT, attributes); 
-    if (nullptr == result.context_) {
+    result.eglContext_ = eglCreateContext(result.eglDisplay_, configuration, EGL_NO_CONTEXT, attributes); 
+    if (nullptr == result.eglContext_) {
       std::cerr << "Failed to create EGL context." << std::endl;
     }
   }
 
   assert(nullptr != surface_);
-  result.eglWindow_ = wl_egl_window_create(surface_, outputMode_.width, outputMode_.height);
+  result.surface_ = surface_;
+  result.window_ = wl_egl_window_create(surface_, outputMode_.width, outputMode_.height);
 
   {
     constexpr EGLAttrib surfaceAttributes[] = { EGL_NONE };
-    result.surface_ = eglCreatePlatformWindowSurface(result.display_, configuration, result.eglWindow_, surfaceAttributes);
+    result.eglSurface_ = eglCreatePlatformWindowSurface(result.eglDisplay_, configuration, result.window_, surfaceAttributes);
   }
 
   {
@@ -373,6 +413,8 @@ EGL Connection::egl() const {
       std::cerr << "EGL_KHR_swap_buffers_with_damage is not supported" << std::endl;
     }
   }
+  
+  result.setupFrameCallback();
 
   return result;
 }
@@ -380,7 +422,7 @@ EGL Connection::egl() const {
 std::unique_ptr<Surface> Connection::surface(EGL && egl) const {
   auto result = std::make_unique<Surface>(std::move(egl));
   assert(nullptr != surface_);
-  result->surface_ = xdg_wm_base_get_xdg_surface(wm_base_, surface_);
+  result->surface_ = xdg_wm_base_get_xdg_surface(wmBase_, surface_);
   xdg_surface_add_listener(result->surface_, &XdgSurfaceListener, result.get());
   result->toplevel_ = xdg_surface_get_toplevel(result->surface_);
   xdg_toplevel_add_listener(result->toplevel_, &TopLevelListener, result.get());
@@ -440,11 +482,10 @@ void Connection::registryGlobal(struct wl_registry * const registry,
   // COMPOSITOR
   if (interface == wl_compositor_interface.name && 4 <= version) {
     compositor_ = static_cast<wl_compositor *>(wl_registry_bind(registry_, name, &wl_compositor_interface, 4));
-
     
   // XDG_SHELL
   } else if (interface == xdg_wm_base_interface.name && 2 <= version) {
-    wm_base_ = static_cast<struct xdg_wm_base *>(wl_registry_bind(registry_, name, &xdg_wm_base_interface, 2));
+    wmBase_ = static_cast<struct xdg_wm_base *>(wl_registry_bind(registry_, name, &xdg_wm_base_interface, 2));
 
   // OUTPUT
   } else if (interface == wl_output_interface.name && 2 <= version) {

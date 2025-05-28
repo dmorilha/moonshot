@@ -40,31 +40,64 @@ struct EGL {
   void resize(std::size_t, std::size_t);
 
   void makeCurrent() const;
-  bool swapBuffers() const;
+  bool swapBuffers(const bool force = false) const;
 
   template <class CONTAINER>
-  bool swapBuffers(const wayland::EGL & egl, CONTAINER & container) const {
-    assert(nullptr != eglSwapBuffersWithDamageKHR_);
-    assert(nullptr != display_);
-    assert(nullptr != surface_);
-    const EGLBoolean result = eglSwapBuffersWithDamageKHR_(
-        display_, surface_, reinterpret_cast<const int *>(container.data()), container.size());
+  bool swapBuffers(const CONTAINER & container, const bool force = false) const {
+    assert(nullptr != eglDisplay_);
+    assert(nullptr != eglSurface_);
+    assert( ! container.empty());
+    if ( ! (drawNextFrame_ || force)) {
+      return true;
+    }
+    drawNextFrame_ = false;
+
+    #if 0
+    EGLint age;
+    eglQuerySurface(display_, surface_, EGL_BUFFER_AGE_EXT, &age);
+    #endif
+
+    EGLBoolean result;
+    if (nullptr != eglSwapBuffersWithDamageKHR_) {
+      result = eglSwapBuffersWithDamageKHR_(
+          eglDisplay_, eglSurface_,
+          reinterpret_cast<const int *>(container.data()),
+          container.size());
+    } else {
+      result = eglSwapBuffers(eglDisplay_, eglSurface_);
+    }
+
     if (EGL_FALSE == result) {
       std::cerr << "EGL buffer swap failed." << std::endl;
+      return false;
     }
-    return EGL_TRUE == result;
+    setupFrameCallback();
+    return true;
   }
 
-  EGLDisplay display() const { return display_; }
-  EGLSurface surface() const { return surface_; }
+  EGLDisplay display() const { return eglDisplay_; }
+  EGLSurface surface() const { return eglSurface_; }
+
+  void frameCallback() const {
+    wl_callback_destroy(frameCallback_);
+    frameCallback_ = nullptr;
+    drawNextFrame_ = true;
+  }
 
 private:
-  EGLContext context_ = nullptr;
-  EGLDisplay display_ = nullptr;
-  EGLSurface surface_ = nullptr;
-  struct wl_egl_window * eglWindow_ = nullptr;
+  void setupFrameCallback() const;
 
-  // EGL Extensions
+  struct wl_egl_window * window_ = nullptr;
+  struct wl_surface * surface_ = nullptr;
+  mutable struct wl_callback * frameCallback_ = nullptr;
+
+  EGLContext eglContext_ = nullptr;
+  EGLDisplay eglDisplay_ = nullptr;
+  EGLSurface eglSurface_ = nullptr;
+
+  mutable bool drawNextFrame_ = false;
+
+  // EGL Extension
   PFNEGLSWAPBUFFERSWITHDAMAGEEXTPROC eglSwapBuffersWithDamageKHR_ = nullptr;
 
   friend class Connection;
@@ -160,7 +193,7 @@ private:
   struct wl_registry * registry_ = nullptr;
   struct wl_seat * seat_ = nullptr;
   struct wl_surface * surface_ = nullptr;
-  struct xdg_wm_base * wm_base_ = nullptr;
+  struct xdg_wm_base * wmBase_ = nullptr;
 
   struct {
     struct xkb_context * context = nullptr;

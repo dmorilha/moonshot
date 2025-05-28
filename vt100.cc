@@ -50,7 +50,7 @@ void vt100::pollin() {
           state_ = ESCAPE;
           break;
         default:
-          screen_->buffer().push_back(Rune{c});
+          screen_->buffer().pushBack(Rune{c});
           break;
         }
       }

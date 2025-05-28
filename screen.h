@@ -1,6 +1,7 @@
 #pragma once
 
 #include <iostream>
+#include <list>
 #include <vector>
 
 #include "buffer.h"
@@ -32,6 +33,10 @@ struct Dimensions {
   friend std::ostream & operator << (std::ostream &, const Dimensions &);
 
   Dimensions & operator = (const Dimensions &) = default;
+};
+
+struct Stash {
+  std::list<Rectangle> rectangles_;
 };
 
 struct Screen {
@@ -68,7 +73,7 @@ struct Screen {
   void repaint();
   void resize(int32_t, int32_t);
   void pushBack(Rune &&);
-  void setCursor(const uint32_t, const uint32_t);
+  void setCursor(const uint32_t, const uint32_t) { assert(!"UNIMPLEMENTED"); }
 
   std::function<void (int32_t, int32_t)> onResize;
 
@@ -89,11 +94,12 @@ private:
 
   Buffer buffer_;
   bool repaint_ = false;
+  bool repaintFull_ = false;
   bool wrap_ = false;
 
   Dimensions dimensions_;
 
-  std::vector<Rectangle> rectangles_;
+  std::list<Rectangle> rectangles_;
 
   friend class Terminal;
   friend class vt100;
