@@ -239,7 +239,7 @@ EGL & EGL::operator = (EGL && other) {
   std::swap(eglContext_, other.eglContext_);
   std::swap(eglDisplay_, other.eglDisplay_);
   std::swap(eglSurface_, other.eglSurface_);
-  std::swap(eglSwapBuffersWithDamageKHR_, other.eglSwapBuffersWithDamageKHR_); 
+  std::swap(eglSwapBuffersWithDamageEXT_, other.eglSwapBuffersWithDamageEXT_); 
   if (nullptr != other.frameCallback_) {
     wl_callback_destroy(other.frameCallback_);
     other.frameCallback_ = nullptr;
@@ -401,19 +401,19 @@ EGL Connection::egl() const {
   }
 
   {
-    const char * const queryStringResult = eglQueryString(display_, EGL_EXTENSIONS);
+    const char * const queryStringResult = eglQueryString(result.eglDisplay_, EGL_EXTENSIONS);
     std::string extensions;
     if (nullptr != queryStringResult && 0 < strlen(queryStringResult)) {
       extensions = queryStringResult;
     }
 
-    if (extensions.find("EGL_KHR_swap_buffers_with_damage")) {
-        result.eglSwapBuffersWithDamageKHR_ = reinterpret_cast<PFNEGLSWAPBUFFERSWITHDAMAGEEXTPROC>(eglGetProcAddress("eglSwapBuffersWithDamageKHR"));
+    if (extensions.find("EGL_EXT_swap_buffers_with_damage") != std::string::npos) {
+        result.eglSwapBuffersWithDamageEXT_ = reinterpret_cast<PFNEGLSWAPBUFFERSWITHDAMAGEEXTPROC>(eglGetProcAddress("eglSwapBuffersWithDamageEXT"));
     } else {
-      std::cerr << "EGL_KHR_swap_buffers_with_damage is not supported" << std::endl;
+      std::cerr << "EGL_EXT_swap_buffers_with_damage is not supported" << std::endl;
     }
   }
-  
+
   result.setupFrameCallback();
 
   return result;

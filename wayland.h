@@ -9,7 +9,6 @@
 #include <wayland-egl.h>
 
 #include <EGL/egl.h>
-// #define EGL_EGLEXT_PROTOTYPES
 #include <EGL/eglext.h>
 
 #include <GLES2/gl2.h>
@@ -52,14 +51,9 @@ struct EGL {
     }
     drawNextFrame_ = false;
 
-    #if 0
-    EGLint age;
-    eglQuerySurface(display_, surface_, EGL_BUFFER_AGE_EXT, &age);
-    #endif
-
     EGLBoolean result;
-    if (nullptr != eglSwapBuffersWithDamageKHR_) {
-      result = eglSwapBuffersWithDamageKHR_(
+    if (nullptr != eglSwapBuffersWithDamageEXT_) {
+      result = eglSwapBuffersWithDamageEXT_(
           eglDisplay_, eglSurface_,
           reinterpret_cast<const int *>(container.data()),
           container.size());
@@ -98,7 +92,7 @@ private:
   mutable bool drawNextFrame_ = false;
 
   // EGL Extension
-  PFNEGLSWAPBUFFERSWITHDAMAGEEXTPROC eglSwapBuffersWithDamageKHR_ = nullptr;
+  PFNEGLSWAPBUFFERSWITHDAMAGEEXTPROC eglSwapBuffersWithDamageEXT_ = nullptr;
 
   friend class Connection;
 };

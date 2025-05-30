@@ -1,3 +1,5 @@
+#include <GL/gl.h>
+
 #include "screen.h"
 #include "types.h"
 
@@ -24,17 +26,29 @@ static const char * const fragment_shader_text =
   "    gl_FragColor = vec4(mix(background, color, character), 1.0);\n"
   "}\n";
 
+static const char * const fragment_shader_text2 =
+  "#version 120\n"
+  "uniform sampler2D texture2;\n"
+  "varying vec2 texcoord;\n"
+  "void main()\n"
+  "{\n"
+  "    gl_FragColor = texture2D(texture2, texcoord);\n"
+  "}\n";
+
 const float background[3] = { 0.f, 0.f, 0.f, };
 const float color[3] = { 0.f, 1.f, 0.f, };
 
 static GLuint vertex_shader = 0;
 static GLuint fragment_shader = 0;
+static GLuint fragment_shader2 = 0;
 
 struct {
   GLint background = 0;
   GLint color = 0;
   GLint texture = 0;
   GLint vpos = 0;
+  GLint texture2 = 0;
+  GLint vpos2 = 0;
 } location;
 } // end of annonymous namespace
 
@@ -60,24 +74,50 @@ Screen Screen::New(const wayland::Connection & connection, Font && font) {
   glShaderSource(fragment_shader, 1, &fragment_shader_text, nullptr);
   glCompileShader(fragment_shader);
 
+  fragment_shader2 = glCreateShader(GL_FRAGMENT_SHADER);
+  glShaderSource(fragment_shader2, 1, &fragment_shader_text2, nullptr);
+  glCompileShader(fragment_shader2);
+
   result.glProgram_ = glCreateProgram();
 
   glAttachShader(result.glProgram_, vertex_shader);
   glAttachShader(result.glProgram_, fragment_shader);
   glLinkProgram(result.glProgram_);
 
-  location.texture = glGetUniformLocation(result.glProgram_, "texture");
   location.background = glGetUniformLocation(result.glProgram_, "background");
   location.color = glGetUniformLocation(result.glProgram_, "color");
+  location.texture = glGetUniformLocation(result.glProgram_, "texture");
   location.vpos = glGetAttribLocation(result.glProgram_, "vPos");
+
+  result.glProgram2_ = glCreateProgram();
+
+  glAttachShader(result.glProgram2_, vertex_shader);
+  glAttachShader(result.glProgram2_, fragment_shader2);
+  glLinkProgram(result.glProgram2_);
+
+  location.texture2 = glGetUniformLocation(result.glProgram2_, "texture2");
+  location.vpos2 = glGetAttribLocation(result.glProgram2_, "vPos");
+
+  glGenFramebuffers(1, &(result.frameBuffer_));
+  assert(0 != result.frameBuffer_);
+
+  glGenTextures(1, &(result.texture_));
+  assert(0 != result.texture_);
 
   result.dimensions();
   result.dimensions_.cursorBottom = (result.dimensions_.scrollY % result.dimensions_.lineHeight) + result.dimensions_.lineHeight * result.dimensions_.lines();
   result.dimensions_.cursorLeft = result.dimensions_.leftPadding + result.dimensions_.scrollX;
 
-  result.paint();
+  result.repaintFull_ = true;
+  result.draw();
 
   return result;
+}
+
+Screen::~Screen() {
+  assert(0 != frameBuffer_);
+  glDeleteFramebuffers(1, &frameBuffer_);
+  frameBuffer_ = 0;
 }
 
 Screen::Screen(std::unique_ptr<wayland::Surface> && surface, Font && font) : surface_(std::move(surface)), font_(std::move(font)) {
@@ -126,8 +166,16 @@ void Screen::changeScrollX(const int32_t value) {
  */
 
 /* a spot for constant re-evaluation */
-void Screen::paint() {
+void Screen::draw() {
   glViewport(0, 0, dimensions_.surfaceWidth, dimensions_.surfaceHeight);
+  assert(0 != frameBuffer_);
+  glBindFramebuffer(GL_DRAW_FRAMEBUFFER, frameBuffer_);
+  assert(0 != texture_);
+  glBindTexture(GL_TEXTURE_2D, texture_);
+  glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, dimensions_.surfaceWidth, dimensions_.surfaceHeight, 0, GL_RGB, GL_UNSIGNED_BYTE, 0);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+  glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, texture_, 0);
 
   /* difference */
   const auto difference = buffer_.difference();
@@ -170,8 +218,16 @@ void Screen::paint() {
       glClear(GL_COLOR_BUFFER_BIT);
       glDisable(GL_SCISSOR_TEST);
 
+      // texture
+      GLuint texture = 0;
+      glGenTextures(1, &texture);
+      glBindTexture(GL_TEXTURE_2D, texture);
+      glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+      glTexImage2D(GL_TEXTURE_2D, 0, GL_LUMINANCE, glyph.width, glyph.height, 0, GL_LUMINANCE, GL_UNSIGNED_BYTE, glyph.pixels);
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+
       // vertices
-      GLuint vertex_buffer = 0;
       const float vertex_bottom = -1.f + dimensions_.scaleHeight() * (dimensions_.cursorBottom + glyph.top - (dimensions_.glyphDescender + glyph.height));
       const float vertex_left = -1.f + dimensions_.scaleWidth() * (dimensions_.cursorLeft + glyph.left);
       const float vertex_right = -1.f + dimensions_.scaleWidth() * (dimensions_.cursorLeft + glyph.left + glyph.width);
@@ -188,36 +244,25 @@ void Screen::paint() {
         { vertex_left, vertex_bottom, 0, 1, },
       }; 
 
+      GLuint vertex_buffer = 0;
       glGenBuffers(1, &vertex_buffer);
       glBindBuffer(GL_ARRAY_BUFFER, vertex_buffer);
       glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
 
-      // texture
-      GLuint texture = 0;
-      glGenTextures(1, &texture);
-      glBindTexture(GL_TEXTURE_2D, texture);
-      glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
-      glTexImage2D(GL_TEXTURE_2D, 0, GL_LUMINANCE, glyph.width, glyph.height, 0, GL_LUMINANCE, GL_UNSIGNED_BYTE, glyph.pixels);
-      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
       assert(0 < glProgram_);
       glUseProgram(glProgram_);
       assert(0 <= location.texture);
       glUniform1i(location.texture, 0);
-
       assert(0 <= location.background);
       glUniform3fv(location.background, 1, background);
-
       assert(0 <= location.color);
       glUniform3fv(location.color, 1, color);
-
-      glBindBuffer(GL_ARRAY_BUFFER, vertex_buffer);
       assert(0 <= location.vpos);
       glEnableVertexAttribArray(location.vpos);
       glVertexAttribPointer(location.vpos, 4, GL_FLOAT, GL_FALSE, sizeof(vertices[0]), nullptr);
-      glBindBuffer(GL_ARRAY_BUFFER, vertex_buffer);
 
       glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
+
       glDeleteBuffers(1, &vertex_buffer);
       glDeleteTextures(1, &texture);
 
@@ -294,16 +339,12 @@ repaintFull:
       // background
       glEnable(GL_SCISSOR_TEST);
       glScissor(cursorLeft, cursorBottom, width, dimensions_.lineHeight);
-      if (rune.hasBackgroundColor) {
-        glClearColor(rune.backgroundColor.red, rune.backgroundColor.green, rune.backgroundColor.blue, rune.backgroundColor.alpha); 
-      } else {
-        glClearColor(background[0], background[1], background[2], 1);
-      }
+      glClearColor(background[0], background[1], background[2], 1);
       glClear(GL_COLOR_BUFFER_BIT);
       glDisable(GL_SCISSOR_TEST);
 
       #if 0
-      std::cout << rune.character << " " << glyph.left << " " << glyph.width << " "
+      std::cout << character << " " << glyph.left << " " << glyph.width << " "
         << glyph.top << " " << glyph.height << " " << dimensions_.lineHeight << std::endl;
       #endif
 
@@ -336,27 +377,18 @@ repaintFull:
       glTexImage2D(GL_TEXTURE_2D, 0, GL_LUMINANCE, glyph.width, glyph.height, 0, GL_LUMINANCE, GL_UNSIGNED_BYTE, glyph.pixels);
       glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
       glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+
       assert(0 < glProgram_);
       glUseProgram(glProgram_);
       assert(0 <= location.texture);
       glUniform1i(location.texture, 0);
-
       assert(0 <= location.background);
-      if (rune.hasBackgroundColor) {
-        glUniform3fv(location.background, 1, rune.backgroundColor);
-      } else {
-        glUniform3fv(location.background, 1, background);
-      }
-
+      glUniform3fv(location.background, 1, background);
       assert(0 <= location.color);
-      if (rune.hasForegroundColor) {
-        glUniform3fv(location.color, 1, rune.foregroundColor);
-      } else {
-        glUniform3fv(location.color, 1, color);
-      }
-
+      glUniform3fv(location.color, 1, color);
       glBindBuffer(GL_ARRAY_BUFFER, vertex_buffer);
       assert(0 <= location.vpos);
+
       glEnableVertexAttribArray(location.vpos);
       glVertexAttribPointer(location.vpos, 4, GL_FLOAT, GL_FALSE, sizeof(vertices[0]), nullptr);
       glBindBuffer(GL_ARRAY_BUFFER, vertex_buffer);
@@ -400,22 +432,58 @@ void Screen::pushBack(Rune && rune) {
 void Screen::repaint() {
   if (repaint_) {
     repaint_ = false;
-    paint();
+    draw();
+    assert(0 != frameBuffer_);
+
+    glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
+    glBindFramebuffer(GL_READ_FRAMEBUFFER, frameBuffer_);
+    glViewport(0, 0, dimensions_.surfaceWidth, dimensions_.surfaceHeight);
+
+    // texture
+    assert(0 != texture_);
+    glBindTexture(GL_TEXTURE_2D, texture_);
+
+    const float vertices[4][4] = {
+      // vertex a - left top
+      { -1, 1, 0, 1, },
+      // vertex b - right top
+      { 1, 1, 1, 1, },
+      // vertex c - right bottom
+      { 1, -1, 1, 0, },
+      // vertex d - left bottom
+      { -1, -1, 0, 0, },
+    }; 
+
+    GLuint vertex_buffer = 0;
+    glGenBuffers(1, &vertex_buffer);
+    glBindBuffer(GL_ARRAY_BUFFER, vertex_buffer);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
+
+    assert(0 < glProgram2_);
+    glUseProgram(glProgram2_);
+    assert(0 <= location.texture2);
+    glUniform1i(location.texture2, 0);
+    assert(0 <= location.vpos2);
+    glEnableVertexAttribArray(location.vpos2);
+    glVertexAttribPointer(location.vpos2, 4, GL_FLOAT, GL_FALSE, sizeof(vertices[0]), nullptr);
+
+    glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
+
     if ( ! repaintFull_ || ! rectangles_.empty()) {
-      // std::cout << "*" << std::flush;
+      // write(1, "*", 1);
       std::vector<Rectangle> rectangles;
       for (auto && item : rectangles_) {
         rectangles.emplace_back(std::move(item));
       }
       surface_->egl().swapBuffers(rectangles);
     } else {
-      // std::cout << "-" << std::flush;
+      // write(1, "!", 1);
       repaintFull_ = false;
       surface_->egl().swapBuffers();
     }
     rectangles_.clear();
   } else {
-    // std::cout << "!" << std::flush;
+    // write(1, "-", 1);
   }
 }
 

@@ -35,11 +35,8 @@ struct Dimensions {
   Dimensions & operator = (const Dimensions &) = default;
 };
 
-struct Stash {
-  std::list<Rectangle> rectangles_;
-};
-
 struct Screen {
+  ~Screen();
   Screen() = delete;
 
   Screen(const Screen &) = delete;
@@ -69,7 +66,7 @@ struct Screen {
   void increaseFontSize() { font_.increaseSize(); dimensions(); }
 
   void clear();
-  void paint();
+  void draw();
   void repaint();
   void resize(int32_t, int32_t);
   void pushBack(Rune &&);
@@ -91,6 +88,9 @@ private:
   std::unique_ptr<wayland::Surface> surface_;
 
   GLuint glProgram_ = 0;
+  GLuint glProgram2_ = 0;
+  GLuint frameBuffer_ = 0;
+  GLuint texture_ = 0;
 
   Buffer buffer_;
   bool repaint_ = false;
