@@ -93,7 +93,6 @@ void Terminal::pollin() {
     }
 
   }
-  // screen_->write();
 }
 
 void Terminal::pollhup() {

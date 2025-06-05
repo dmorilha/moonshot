@@ -7,24 +7,25 @@
 #include "buffer.h"
 #include "font.h"
 #include "freetype.h"
+#include "opengl.h"
 #include "rune.h"
 #include "wayland.h"
 
 struct Dimensions {
   uint16_t column = 0;
   int16_t cursorLeft = 0;
-  int16_t cursorBottom = 0;
+  int16_t cursorTop = 0;
   uint16_t glyphAscender = 0;
   int16_t glyphDescender = 0;
   uint16_t lineHeight = 0;
   uint16_t glyphWidth = 0;
-  uint16_t leftPadding = 10;
+  uint16_t leftPadding = 0;
+  uint16_t bottomPadding = 0;
   uint16_t line = 0;
-  int16_t scrollX = 0;
-  int16_t scrollY = 0;
+  int32_t scrollX = 0;
+  uint32_t scrollY = 0;
   uint16_t surfaceHeight = 0;
   uint16_t surfaceWidth = 0;
-  uint16_t bottomPadding = 10;
   constexpr uint16_t columns() const { return std::floor((surfaceWidth - leftPadding * 2) / glyphWidth); }
   constexpr uint16_t lines() const { return std::floor((surfaceHeight - bottomPadding * 2) / lineHeight); }
   constexpr float scaleHeight() const { return 2.f / surfaceHeight; }
@@ -35,6 +36,45 @@ struct Dimensions {
   Dimensions & operator = (const Dimensions &) = default;
 };
 
+struct Framebuffer {
+private:
+  struct Entry {
+    opengl::Framebuffer framebuffer;
+    Rectangle area;
+  };
+
+  using Container = std::list<Entry>;
+
+public:
+  struct Draw {
+    ~Draw();
+    auto operator()(Rectangle &&) -> Rectangle;
+
+  private:
+    Draw(Framebuffer & framebuffer);
+    Framebuffer & framebuffer_;
+
+    friend class Framebuffer;
+  };
+
+  auto clear() -> void;
+  auto draw() -> Draw { return Draw(*this); }; 
+  auto repaint(const uint16_t offset = 0, uint32_t scroll = 0) -> void;
+  auto resize(const uint16_t, const uint16_t) -> void;
+
+  constexpr auto scaleHeight() -> float const { return 2.f / height_; }
+  constexpr auto scaleWidth() -> float const { return 2.f / width_; }
+
+private:
+  auto update(Rectangle &) -> void;
+
+  Container container_;
+  Container::iterator current_ = container_.end();
+
+  uint16_t height_ = 0;
+  uint16_t width_ = 0;
+};
+
 struct Screen {
   ~Screen();
   Screen() = delete;
@@ -43,15 +83,6 @@ struct Screen {
   Screen(Screen &&);
   Screen & operator = (const Screen &) = delete;
   Screen & operator = (Screen && other) = delete;
-
-#if 0
-  template <class ... Args>
-  void loadFace(Args && ... args) {
-    face_ = freetype_.load(std::forward<Args>(args)...);
-    dimensions();
-    repaint_ = true;
-  }
-#endif
 
   static Screen New(const wayland::Connection &, Font &&);
 
@@ -66,7 +97,6 @@ struct Screen {
   void increaseFontSize() { font_.increaseSize(); dimensions(); }
 
   void clear();
-  void draw();
   void repaint();
   void resize(int32_t, int32_t);
   void pushBack(Rune &&);
@@ -78,6 +108,7 @@ private:
   Buffer & buffer() { return buffer_; }
   void makeCurrent() const { surface_->egl().makeCurrent(); }
   bool swapBuffers() const { return surface_->egl().swapBuffers(); }
+  void draw();
 
   Screen(std::unique_ptr<wayland::Surface> &&, Font &&);
 
@@ -88,9 +119,8 @@ private:
   std::unique_ptr<wayland::Surface> surface_;
 
   GLuint glProgram_ = 0;
-  GLuint glProgram2_ = 0;
-  GLuint frameBuffer_ = 0;
-  GLuint texture_ = 0;
+  Framebuffer framebuffer_;
+  std::list<Rectangle> rectangles_;
 
   Buffer buffer_;
   bool repaint_ = false;
@@ -98,8 +128,6 @@ private:
   bool wrap_ = false;
 
   Dimensions dimensions_;
-
-  std::list<Rectangle> rectangles_;
 
   friend class Terminal;
   friend class vt100;
