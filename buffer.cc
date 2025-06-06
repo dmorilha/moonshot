@@ -7,20 +7,12 @@ void Buffer::clear() {
   state_ = INITIAL;
 }
 
-void Buffer::push_back(Rune && rune) {
+void Buffer::pushBack(Rune && rune) {
   bool newLine = false;
   if (rune.iscontrol()) {
     switch (rune.character) {
     case L'\a': // BELL
       // what should we do?
-      return;
-      break;
-
-    case L'\b': // BACKSPACE
-      if (L'\n' != container_.back() && ! container_.empty()) {
-        container_.erase(container_.end());
-        --lines_.back();
-      }
       return;
       break;
 
@@ -60,7 +52,7 @@ Buffer::const_reverse_iterator::const_reverse_iterator(const Buffer & b, const u
   currentOffset_ = std::accumulate(iterator, iterator + line_, 0);
 }
 
-const Buffer::Line Buffer::const_reverse_iterator::operator * () const {
+const Buffer::Span Buffer::const_reverse_iterator::operator * () const {
   const std::size_t size = buffer_.container_.size();
   switch (line_) {
   case 0:
@@ -73,9 +65,17 @@ const Buffer::Line Buffer::const_reverse_iterator::operator * () const {
     {
       const std::size_t offset = currentOffset_ - buffer_.lines_[line_ - 1];
       const auto iterator = buffer_.container_.begin();
-      return Line(iterator + offset, iterator + currentOffset_);
+      return Span(iterator + offset, iterator + currentOffset_);
     }
     break;
   }
-  return Line();
+  return Span();
+}
+
+Buffer::Span Buffer::difference() {
+  Span result;
+  uint64_t mark = container_.size();
+  std::swap(mark, mark_);
+  result = Span(container_.begin() + mark, container_.begin() + mark_);
+  return result;
 }

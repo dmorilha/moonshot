@@ -9,6 +9,7 @@
 
 #include <fcntl.h>
 #include <pty.h>
+#include <termios.h>
 #include <utmp.h>
 
 #include <unistd.h>
@@ -24,7 +25,6 @@ Terminal::Terminal(Screen * const screen) : Events(POLLIN | POLLHUP), screen_(sc
 
 /* pollin should:
  *  - be broken into a generic piece towards reuse.
- *  - make use of mbrstowcs to parse multiple characters.
  *  - the parsed characters are then pumped into the caller
  *    for further processing.
  */
@@ -54,7 +54,7 @@ void Terminal::pollin() {
 #if DEBUG
       std::array<char, 5> display{'\0'};
       strncpy(display.data(), static_cast<const char *>(&buffer_[iterator]), bytes);
-      std::cout << __func__ << ": " << iterator << ", " << bufferStart_ << ", " << length << ", " << size << " " << display.data() << std::endl;
+      std::cout << __func__ << ": " << iterator << ", " << bufferStart_ << ", " << length << ", " << size << ", " << bytes << " " << display.data() << std::endl;
 #endif //DEBUG
       switch (bytes) {
       case -2: /* INCOMPLETE */
@@ -73,7 +73,7 @@ void Terminal::pollin() {
         bufferStart_ = 0;
         break;
       default:
-        screen_->buffer().push_back(Rune{character});
+        screen_->pushBack(Rune{character});
         iterator += bytes;
         bufferStart_ = 0;
         break;
@@ -93,7 +93,6 @@ void Terminal::pollin() {
     }
 
   }
-  screen_->write();
 }
 
 void Terminal::pollhup() {
@@ -126,7 +125,11 @@ std::unique_ptr<Terminal> Terminal::New(Screen * const screen) {
 
   instance->winsize_.ws_col = screen->getColumns();
   instance->winsize_.ws_row = screen->getLines();
+
   openpty(&instance->fd_.child, &instance->fd_.parent, nullptr, nullptr, &instance->winsize_);
+
+  struct termios flags;
+  tcgetattr(instance->fd_.child, &flags);
 
   instance->pid_ = fork();
   if (0 == instance->pid_) { /* CHILD */

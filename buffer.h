@@ -13,10 +13,10 @@
 
 struct Buffer {
   using Container = std::vector<Rune>;
-  using Line = std::span<const Rune>;
+  using Span = std::span<const Rune>;
 
   struct const_reverse_iterator {
-    const Line operator * () const;
+    const Span operator * () const;
 
     const_reverse_iterator & operator ++ () {
       if (0 < line_) {
@@ -43,32 +43,36 @@ struct Buffer {
 
   const_reverse_iterator rend() const { return const_reverse_iterator(*this); }
 
-  Line firstLine() const {
+  Span firstLine() const {
     assert(!lines_.empty());
-    return Line(container_.begin(), lines_[0]);
+    return Span(container_.begin(), lines_[0]);
   }
 
-  Line lastLine() const {
+  Span lastLine() const {
     assert(!lines_.empty());
-    return Line(container_.end() - lines_.back(), container_.end());
+    return Span(container_.end() - lines_.back(), container_.end());
   }
 
-  Line operator [] (const uint16_t i) const {
+  Span difference();
+
+  Span operator [] (const uint16_t i) const {
     const std::size_t offset = std::accumulate(lines_.begin(), lines_.begin() + i, 0);
-    return Line(container_.begin() + offset, lines_[i]);
+    return Span(container_.begin() + offset, lines_[i]);
   }
 
   void setCap(const uint32_t);
   std::size_t lines() const { return lines_.size(); }
   void clear();
-  void push_back(Rune &&);
+  void pushBack(Rune &&);
 
 private:
   using Lines = std::deque<uint16_t>;
 
   Container container_;
+  Span differences_;
   Lines lines_ = {0};
   uint32_t cap_ = 0;
+  uint64_t mark_ = 0;
 
   enum {
     INITIAL = 0,
