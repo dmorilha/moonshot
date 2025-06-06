@@ -13,8 +13,8 @@
 
 struct Dimensions {
   uint16_t column = 0;
-  int16_t cursorLeft = 0;
-  int16_t cursorTop = 0;
+  uint16_t cursorLeft = 0;
+  uint32_t cursorTop = 0;
   uint16_t glyphAscender = 0;
   int16_t glyphDescender = 0;
   uint16_t lineHeight = 0;
@@ -57,10 +57,13 @@ public:
     friend class Framebuffer;
   };
 
-  auto clear() -> void;
+  Framebuffer(const uint8_t cap = 0) : cap_(cap) { }
+
   auto draw() -> Draw { return Draw(*this); }; 
+  auto paintFrame(const uint16_t frame = 0) -> bool;
   auto repaint(const uint16_t offset = 0, uint32_t scroll = 0) -> void;
   auto resize(const uint16_t, const uint16_t) -> void;
+  auto height() const -> uint32_t;
 
   constexpr auto scaleHeight() -> float const { return 2.f / height_; }
   constexpr auto scaleWidth() -> float const { return 2.f / width_; }
@@ -73,6 +76,7 @@ private:
 
   uint16_t height_ = 0;
   uint16_t width_ = 0;
+  uint8_t cap_ = 0;
 };
 
 struct Screen {
@@ -119,7 +123,7 @@ private:
   std::unique_ptr<wayland::Surface> surface_;
 
   GLuint glProgram_ = 0;
-  Framebuffer framebuffer_;
+  Framebuffer framebuffer_ = Framebuffer(/* total number of framebuffers */ 5);
   std::list<Rectangle> rectangles_;
 
   Buffer buffer_;

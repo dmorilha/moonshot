@@ -16,15 +16,6 @@ void Buffer::pushBack(Rune && rune) {
       return;
       break;
 
-    case L'\b': // BACKSPACE
-      if (L'\n' != container_.back() && ! container_.empty()) {
-        container_.erase(container_.end());
-        mark_ = container_.size();
-        --lines_.back();
-      }
-      return;
-      break;
-
     case L'\n': // NEW LINE
       newLine = true;
       break;
