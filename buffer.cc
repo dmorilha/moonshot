@@ -7,7 +7,7 @@ void Buffer::clear() {
   state_ = INITIAL;
 }
 
-void Buffer::pushBack(Rune && rune) {
+void Buffer::pushBack(rune::Rune && rune) {
   bool newLine = false;
   if (rune.iscontrol()) {
     switch (rune.character) {
@@ -78,4 +78,30 @@ Buffer::Span Buffer::difference() {
   std::swap(mark, mark_);
   result = Span(container_.begin() + mark, container_.begin() + mark_);
   return result;
+}
+
+rune::Rune Buffer::get(const uint32_t line, const uint16_t column) {
+  assert(0 < column);
+  assert(0 < line);
+  if (line <= lines_.size()) {
+    const auto linesIterator = lines_.begin();
+    const uint64_t offset = std::accumulate(linesIterator, linesIterator + line - 1, 0);
+    const uint16_t size = lines_[line - 1];
+
+    Container::const_iterator iterator = container_.cbegin() + offset;
+    for (uint16_t i = 1, j = 1; j <= size; ++i, ++j, ++iterator) {
+      assert(container_.cend() != iterator);
+      if (column == i) {
+        return *iterator;
+      }
+      if (L'\t' == *iterator) {
+        const uint16_t tab = 8 - (i % 8);
+        if (column > i && column <= i + tab) {
+          return *iterator;
+        }
+        i += tab;
+      }
+    }
+  }
+  return rune::Rune('\0');
 }

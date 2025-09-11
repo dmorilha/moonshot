@@ -33,8 +33,8 @@ int main(int argc, char ** argv) {
     .bold = "/usr/share/fonts/liberation-fonts/LiberationMono-Bold.ttf",
     .boldItalic = "/usr/share/fonts/liberation-fonts/LiberationMono-BoldItalic.ttf",
     .italic = "/usr/share/fonts/liberation-fonts/LiberationMono-Italic.ttf",
-    .regular = "/usr/share/fonts/liberation-fonts/LiberationMono-Bold.ttf",
-    .size = 8,
+    .regular = "/usr/share/fonts/liberation-fonts/LiberationMono-Regular.ttf",
+    .size = 15,
   });
 
   Screen screen{Screen::New(connection, std::move(font))};
@@ -80,8 +80,21 @@ int main(int argc, char ** argv) {
       screen.changeScrollY(value);
       break;
     case X:
-      screen.changeScrollX(value);
       break;
+    }
+  };
+
+  struct {
+    bool leftPressed = false;
+    int32_t x = 0;
+    int32_t y = 0;
+  } pointer;
+
+  connection.onPointerMotion = [&](int32_t x, int32_t y) {
+    pointer.x = 0 > x ? 0 : x;
+    pointer.y = 0 > y ? 0 : y;
+    if (pointer.leftPressed) {
+      screen.drag(pointer.x, pointer.y);
     }
   };
 
@@ -92,11 +105,23 @@ int main(int argc, char ** argv) {
       LEFT = 272,
       RIGHT = 273,
     };
+
+    if (LEFT == button) {
+      pointer.leftPressed = CLICK == state;
+    }
+
     if (CLICK == state) {
       switch (button) {
       case LEFT:
+        screen.startSelection(pointer.x, pointer.y);
         break;
-      case RIGHT:
+      default:
+        break;
+      }
+    } else if (RELEASE == state) {
+      switch (button) {
+      case LEFT:
+        screen.endSelection();
         break;
       default:
         break;

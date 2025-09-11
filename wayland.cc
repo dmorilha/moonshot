@@ -8,6 +8,7 @@
 #include <xkbcommon/xkbcommon-compose.h>
 #include <xkbcommon/xkbcommon-keysyms.h>
 
+
 #include "wayland.h"
 
 namespace wayland {
@@ -103,9 +104,15 @@ constexpr static struct wl_pointer_listener PointerListener{
 
   .motion{[](void * data,
     struct wl_pointer * pointer,
-    uint32_t serial,
+    uint32_t time,
     wl_fixed_t x,
-    wl_fixed_t y) { /* UNIMPLEMENTED */ }},
+    wl_fixed_t y) {
+      Connection * const connection = static_cast<Connection *>(data);
+      assert(nullptr != connection);
+      const int32_t xInteger = wl_fixed_to_int(x);
+      const int32_t yInteger = wl_fixed_to_int(y);
+      connection->pointerMotion(pointer, time, xInteger, yInteger);
+    }},
 
   .button{[](void * data,
     struct wl_pointer * pointer,
@@ -310,6 +317,8 @@ void Surface::onToplevelConfigure(struct xdg_toplevel *, const int32_t width, co
     height_ = std::max(height, 0);
     width_ = std::max(width, 0);
     egl_.resize(width, height);
+    assert(nullptr != surface_);
+    // xdg_surface_set_window_geometry(surface_, 0, 0, width_, height_);
     if (static_cast<bool>(onResize)) {
       onResize(width, height);
     }
@@ -320,7 +329,7 @@ void Connection::outputMode(struct wl_output * output, uint32_t flags, int32_t w
   outputMode_.height = std::max(0, height);
   outputMode_.width = std::max(0, width);
   if (flags & WL_OUTPUT_MODE_CURRENT) {
-    std::cout << "refresh " << refresh << " " << (1000000 / refresh) << std::endl;
+    /* std::cout << "refresh " << refresh << " " << (1000000 / refresh) << std::endl; */
   }
 }
 
@@ -492,6 +501,10 @@ void Connection::registryGlobal(struct wl_registry * const registry,
     output_ = static_cast<struct wl_output *>(wl_registry_bind(registry, name, &wl_output_interface, 2));
     wl_output_add_listener(output_, &OutputListener, this);
 
+  // SHM
+  } else if (interface == wl_shm_interface.name) {
+    shared_memory_ = static_cast<struct wl_shm *>(wl_registry_bind(registry, name, &wl_shm_interface, 1));
+
   // SEAT
   } else if (interface == wl_seat_interface.name && 5 <= version) {
     seat_ = static_cast<struct wl_seat *>(wl_registry_bind(registry, name, &wl_seat_interface, 5));
@@ -505,6 +518,11 @@ void Connection::seatCapabilities(struct wl_seat * const seat, const uint32_t ca
     assert(nullptr == pointer_);
     pointer_ = wl_seat_get_pointer(seat);
     wl_pointer_add_listener(pointer_, &PointerListener, this);
+    assert(nullptr != shared_memory_);
+    if (nullptr == wl_cursor_theme_load(nullptr, 16, shared_memory_)) {
+      std::cerr << "failed to load a cursor theme" << std::endl;
+    }
+
   }
   if (0 != WL_SEAT_CAPABILITY_KEYBOARD & capabilities) {
     assert(nullptr == keyboard_);
@@ -531,12 +549,19 @@ void Connection::keyboardKeymap(struct wl_keyboard * keyboard,
   assert(nullptr != xkb_.state);
 
   {
+    const std::string LC_CTYPE_KEY = "LC_CTYPE=";
     const std::string locale = std::locale("").name();
+    std::string lc_ctype = "en_US.utf-8";
+    const std::size_t beginning = locale.find(LC_CTYPE_KEY);
+    const std::size_t end = locale.find_first_of(';', beginning);
+    if (std::string::npos != beginning) {
+      lc_ctype = locale.substr(beginning + LC_CTYPE_KEY.size(), end - beginning - LC_CTYPE_KEY.size());
 #if DEBUG
-    std::cout << "LC_CTYPE " << locale << std::endl;
+      std::cout << LC_CTYPE_KEY << lc_ctype << std::endl;
 #endif
-    xkb_.compose_table = xkb_compose_table_new_from_locale(xkb_.context, locale.c_str(), XKB_COMPOSE_COMPILE_NO_FLAGS);
-    assert(nullptr != xkb_.compose_table);
+      xkb_.compose_table = xkb_compose_table_new_from_locale(xkb_.context, lc_ctype.c_str(), XKB_COMPOSE_COMPILE_NO_FLAGS);
+      assert(nullptr != xkb_.compose_table);
+    }
   }
 
   xkb_.compose_state = xkb_compose_state_new(xkb_.compose_table, XKB_COMPOSE_STATE_NO_FLAGS);
@@ -589,7 +614,7 @@ void Connection::keyboardKey(struct wl_keyboard * keyboard,
 
   if (XKB_COMPOSE_FEED_ACCEPTED == xkb_compose_state_feed(xkb_.compose_state, keysym)) {
     const xkb_compose_status status = xkb_compose_state_get_status(xkb_.compose_state);
-#if DEBUG
+#if 0
     std::cout << "status ";
     switch (status) {
     case XKB_COMPOSE_NOTHING:
@@ -646,6 +671,12 @@ void Connection::pointerAxis(struct wl_pointer * pointer, uint32_t time, uint32_
 void Connection::pointerButton(struct wl_pointer * pointer, uint32_t serial, uint32_t time, uint32_t button, uint32_t state) {
   if (static_cast<bool>(onPointerButton)) {
     onPointerButton(button, state);
+  }
+}
+
+void Connection::pointerMotion(struct wl_pointer * pointer, uint32_t time, int32_t x, int32_t y) {
+  if (static_cast<bool>(onPointerMotion)) {
+    onPointerMotion(x, y);
   }
 }
 

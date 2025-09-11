@@ -73,7 +73,7 @@ void Terminal::pollin() {
         bufferStart_ = 0;
         break;
       default:
-        screen_->pushBack(Rune{character});
+        screen_->pushBack(rune::Rune{character});
         iterator += bytes;
         bufferStart_ = 0;
         break;
@@ -116,7 +116,7 @@ std::unique_ptr<Terminal> Terminal::New(Screen * const screen) {
   std::transform(terminalType.begin(), terminalType.end(), terminalType.begin(),
     std::bind(std::tolower<std::string::value_type>, std::placeholders::_1, std::locale("")));
 
-  if ("vt100" == terminalType) {
+  if ("vt100" == terminalType || "xterm-256color") {
     instance = std::unique_ptr<Terminal>(new vt100(screen));
   } else {
     unsetenv("TERM");

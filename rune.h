@@ -6,22 +6,27 @@
 
 #include "types.h"
 
+namespace rune {
+
+enum class Style {
+  REGULAR,
+  BOLD,
+  ITALIC,
+  BOLD_AND_ITALIC,
+};
+
+struct RuneFactory;
+
 struct Rune {
-  bool hasBackgroundColor = false;
-  bool hasForegroundColor = false;
   Color backgroundColor;
   Color foregroundColor;
+  Style style = Style::REGULAR;
+  bool hasBackgroundColor = false;
+  bool hasForegroundColor = false;
   wchar_t character;
 
   Rune() = default;
   Rune(const wchar_t c) : character(c) { }
-
-  enum {
-    REGULAR,
-    BOLD,
-    ITALIC,
-    BOLD_AND_ITALIC,
-  } style = REGULAR;
 
   bool isalphanumeric() const { return std::isalnum(character, locale_); }
   bool isalpha() const { return std::isalpha(character, locale_); }
@@ -39,8 +44,21 @@ struct Rune {
   bool operator == (const char c) const { return character == c; }
   operator std::string() const;
 
+  friend RuneFactory;
   friend std::ostream & operator << (std::ostream &, const Rune &);
 
 private:
   static const std::locale locale_;
 };
+
+struct RuneFactory {
+  Rune make(const wchar_t);
+  void reset();
+  Color backgroundColor;
+  Color foregroundColor;
+  bool hasBackgroundColor = false;
+  bool hasForegroundColor = false;
+  bool isBold = false;
+  bool isItalic = false;
+};
+} // end of rune namespace

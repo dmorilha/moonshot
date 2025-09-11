@@ -65,7 +65,7 @@ struct Library {
   ~Library();
   Library();
 
-  Face load(const std::string &, const uint16_t, const uint16_t dpi = 150);
+  Face load(const std::string &, const uint16_t, const uint16_t dpi = 96);
 
 private:
   FT_Library library_ = nullptr;

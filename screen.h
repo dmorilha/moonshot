@@ -5,36 +5,13 @@
 #include <vector>
 
 #include "buffer.h"
+#include "dimensions.h"
 #include "font.h"
 #include "freetype.h"
 #include "opengl.h"
 #include "rune.h"
+#include "types.h"
 #include "wayland.h"
-
-struct Dimensions {
-  uint16_t column = 0;
-  uint16_t cursorLeft = 0;
-  uint32_t cursorTop = 0;
-  uint16_t glyphAscender = 0;
-  int16_t glyphDescender = 0;
-  uint16_t lineHeight = 0;
-  uint16_t glyphWidth = 0;
-  uint16_t leftPadding = 0;
-  uint16_t bottomPadding = 0;
-  uint16_t line = 0;
-  int32_t scrollX = 0;
-  uint32_t scrollY = 0;
-  uint16_t surfaceHeight = 0;
-  uint16_t surfaceWidth = 0;
-  constexpr uint16_t columns() const { return std::floor((surfaceWidth - leftPadding * 2) / glyphWidth); }
-  constexpr uint16_t lines() const { return std::floor((surfaceHeight - bottomPadding * 2) / lineHeight); }
-  constexpr float scaleHeight() const { return 2.f / surfaceHeight; }
-  constexpr float scaleWidth() const { return 2.f / surfaceWidth; }
-
-  friend std::ostream & operator << (std::ostream &, const Dimensions &);
-
-  Dimensions & operator = (const Dimensions &) = default;
-};
 
 struct Framebuffer {
 private:
@@ -48,7 +25,7 @@ private:
 public:
   struct Draw {
     ~Draw();
-    auto operator()(Rectangle &&) -> Rectangle;
+    auto operator()(Rectangle, const Color & color = {0.f, 0.f, 0.f, 0.f}) -> Rectangle;
 
   private:
     Draw(Framebuffer & framebuffer);
@@ -101,18 +78,30 @@ struct Screen {
   void increaseFontSize() { font_.increaseSize(); dimensions(); }
 
   void clear();
+  void pushBack(rune::Rune &&);
   void repaint();
   void resize(int32_t, int32_t);
-  void pushBack(Rune &&);
-  void setCursor(const uint32_t, const uint32_t) { assert(!"UNIMPLEMENTED"); }
+  void setCursor(uint16_t, uint16_t);
+  void setPosition(uint16_t, uint16_t);
+  void setTitle(const std::string);
+
+  void drag(const uint16_t, const uint16_t);
+
+  void startSelection(uint16_t, uint16_t);
+  void endSelection();
 
   std::function<void (int32_t, int32_t)> onResize;
 
 private:
   Buffer & buffer() { return buffer_; }
   void makeCurrent() const { surface_->egl().makeCurrent(); }
-  bool swapBuffers() const { return surface_->egl().swapBuffers(); }
+  void swapBuffers() ;
+
   void draw();
+
+  void select(const Rectangle & rectangle);
+
+  Rectangle printCharacter(Framebuffer::Draw & drawer, const Rectangle &, rune::Rune);
 
   Screen(std::unique_ptr<wayland::Surface> &&, Font &&);
 
@@ -127,12 +116,14 @@ private:
   std::list<Rectangle> rectangles_;
 
   Buffer buffer_;
-  bool repaint_ = false;
+
+  enum {
+    NO,
+    DRAW,
+    SCROLL,
+  } repaint_ = NO;
+
   bool repaintFull_ = false;
-  bool wrap_ = false;
 
   Dimensions dimensions_;
-
-  friend class Terminal;
-  friend class vt100;
 };

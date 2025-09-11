@@ -12,8 +12,8 @@
 #include "rune.h"
 
 struct Buffer {
-  using Container = std::vector<Rune>;
-  using Span = std::span<const Rune>;
+  using Container = std::vector<rune::Rune>;
+  using Span = std::span<const rune::Rune>;
 
   struct const_reverse_iterator {
     const Span operator * () const;
@@ -55,15 +55,11 @@ struct Buffer {
 
   Span difference();
 
-  Span operator [] (const uint16_t i) const {
-    const std::size_t offset = std::accumulate(lines_.begin(), lines_.begin() + i, 0);
-    return Span(container_.begin() + offset, lines_[i]);
-  }
-
   void setCap(const uint32_t);
   std::size_t lines() const { return lines_.size(); }
   void clear();
-  void pushBack(Rune &&);
+  void pushBack(rune::Rune &&);
+  rune::Rune get(const uint32_t, const uint16_t);
 
 private:
   using Lines = std::deque<uint16_t>;

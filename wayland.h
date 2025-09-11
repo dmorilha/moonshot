@@ -163,29 +163,37 @@ struct Connection {
       uint32_t key,
       uint32_t state);
 
+  void pointerAxis(struct wl_pointer * pointer,
+      uint32_t time,
+      uint32_t axis,
+      int32_t value);
+
   void pointerButton(struct wl_pointer * pointer,
     uint32_t serial,
     uint32_t time,
     uint32_t button,
     uint32_t state);
 
-  void pointerAxis(struct wl_pointer * pointer,
-      uint32_t time,
-      uint32_t axis,
-      int32_t value);
+  void pointerMotion(struct wl_pointer * pointer,
+      uint32_t serial,
+      int32_t x,
+      int32_t y);
 
   std::function<void (const uint32_t, const char * const, const size_t, const uint32_t)> onKeyPress;
   std::function<void (uint32_t, int32_t)> onPointerAxis;
   std::function<void (uint32_t, uint32_t)> onPointerButton;
+  std::function<void (int32_t, int32_t)> onPointerMotion;
 
 private:
   struct wl_compositor * compositor_ = nullptr;
   struct wl_display * display_ = nullptr;
   struct wl_keyboard * keyboard_ = nullptr;
   struct wl_output * output_ = nullptr;
+  
   struct wl_pointer * pointer_ = nullptr;
   struct wl_registry * registry_ = nullptr;
   struct wl_seat * seat_ = nullptr;
+  struct wl_shm * shared_memory_ = nullptr;
   struct wl_surface * surface_ = nullptr;
   struct xdg_wm_base * wmBase_ = nullptr;
 
