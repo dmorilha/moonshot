@@ -180,7 +180,22 @@ Rectangle Screen::printCharacter(Framebuffer::Draw & drawer, const Rectangle & r
     }
   }
 
-  freetype::Glyph glyph = font_.regular().glyph(rune.character);
+  freetype::Glyph glyph;
+
+  switch (rune.style) {
+  case rune::Style::REGULAR:
+    glyph = font_.regular().glyph(rune.character);
+    break;
+  case rune::Style::BOLD:
+    glyph = font_.bold().glyph(rune.character);
+    break;
+  case rune::Style::ITALIC:
+    glyph = font_.italic().glyph(rune.character);
+    break;
+  case rune::Style::BOLD_AND_ITALIC:
+    glyph = font_.boldItalic().glyph(rune.character);
+    break;
+  }
 
   Rectangle target = drawer(rectangle, rune.backgroundColor);
 
@@ -221,9 +236,9 @@ Rectangle Screen::printCharacter(Framebuffer::Draw & drawer, const Rectangle & r
   glUniform1i(location.texture, 0);
   assert(0 <= location.background);
   if (rune.hasBackgroundColor) {
-    glUniform3fv(location.background, 1, backgroundColor);
-  } else {
     glUniform3fv(location.background, 1, rune.backgroundColor);
+  } else {
+    glUniform3fv(location.background, 1, backgroundColor);
   }
   assert(0 <= location.color);
   if (rune.hasForegroundColor) {
