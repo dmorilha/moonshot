@@ -3,6 +3,8 @@
 #include <cmath>
 #include <iostream>
 
+#include <cassert>
+
 #include "types.h"
 
 /*
@@ -11,25 +13,33 @@
  */
 
 struct Dimensions {
-  uint16_t offset = 0;
   uint16_t column = 1;
+  uint16_t line = 1;
+
+  // blank space when not all lines are filled measured in pixels
+  uint16_t offset = 0;
+
   uint16_t cursorLeft = 0;
-  uint32_t cursorTop = 0;
-  uint16_t glyphAscender = 0;
+  uint16_t cursorTop = 0;
+
+  // how many pixels it scrolled bottom up
+  uint32_t scrollY = 0;
+
+  uint16_t surfaceHeight = 0;
+  uint16_t surfaceWidth = 0;
+
+  // total number of lines
+  uint64_t totalLines = 1;
+
+  // padding (not used)
+  uint16_t leftPadding = 0;
+  uint16_t bottomPadding = 0;
+
+  // font related dimensions
   int16_t glyphDescender = 0;
   uint16_t lineHeight = 0;
   uint16_t glyphWidth = 0;
-  uint16_t leftPadding = 0;
-  uint16_t bottomPadding = 0;
-  uint16_t line = 1;
-  uint16_t pointerLine = 0;
-  uint16_t pointerColumn = 0;
   uint32_t screenTop = 0;
-  int32_t scrollX = 0;
-  uint32_t scrollY = 0;
-  uint16_t surfaceHeight = 0;
-  uint16_t surfaceWidth = 0;
-  uint64_t totalLines = 1;
 
   Rectangle selection = {0, 0, 0, 0};
 
@@ -49,7 +59,8 @@ struct Dimensions {
     return 2.f / surfaceWidth;
   }
 
-  constexpr uint64_t bufferedLines() const {
+  // scrollback buffer
+  constexpr uint64_t bufferLines() const {
     return std::max<int64_t>(0, totalLines - lines());
   }
 
@@ -70,4 +81,6 @@ struct Dimensions {
   friend std::ostream & operator << (std::ostream &, const Dimensions &);
 
   Dimensions & operator = (const Dimensions &) = default;
+  Dimensions(const Dimensions &) = default;
+  Dimensions() = default;
 };

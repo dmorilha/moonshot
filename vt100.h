@@ -17,6 +17,14 @@ struct vt100 : public Terminal {
     {35, color::magenta},
     {36, color::cyan},
     {37, color::white},
+    {40, color::black},
+    {41, color::red},
+    {42, color::green},
+    {43, color::yellow},
+    {44, color::blue},
+    {45, color::magenta},
+    {46, color::cyan},
+    {47, color::white},
   };
 
 private:
@@ -28,12 +36,13 @@ private:
   void handleAPC(const char);
   void handleCSI(const char);
   void handleDCS(const char);
+  void handleDecMode(const unsigned int, const bool);
   void handleOSC(const char);
   void handlePM(const char);
   void handleSGR();
   void handleSGRCommand(const int);
 
-  void handleDecMode(const unsigned int, const bool);
+  void reportDeviceStatus(const int32_t);
 
   EscapeSequence escapeSequence_;
 

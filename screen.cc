@@ -141,8 +141,6 @@ void Screen::resize(int32_t width, int32_t height) {
 
 Screen::Screen(Screen && other) : surface_(std::move(other.surface_)), font_(std::move(other.font_)) { }
 
-void Screen::clear() { }
-
 void Screen::changeScrollY(const int32_t value) {
   int64_t scrollY = 0;
   // screen top might be more than what framebuffer contains
@@ -176,6 +174,7 @@ Rectangle Screen::printCharacter(Framebuffer::Draw & drawer, const Rectangle & r
       rune.character = L' ';
       break;
     default:
+      assert(!"UNIMPLEMENTED");
       break;
     }
   }
@@ -277,20 +276,22 @@ void Screen::pushBack(rune::Rune && rune) {
       dimensions_.cursorLeft -= width;
       return;
 
-    case L'\t': // HORIZONTAL TAB
+    case L'\t': // horizontal tab
       tab = 8 - (dimensions_.column % 8);
       width *= tab;
       rune.character = L' ';
       break;
 
-    case L'\r': // CARRIAGE RETURN
+    case L'\r': // carriage return
       dimensions_.column = 0;
       dimensions_.cursorLeft = 0;
       return;
 
-    case L'\n': // NEW LINE
+    case L'\n': // new line
       dimensions_.totalLines += 1;
-      dimensions_.line = std::min(dimensions_.line + 1, dimensions_.lines() - 1);
+      if (dimensions_.line < dimensions_.lines() - 1) {
+        dimensions_.line += 1;
+      }
       dimensions_.cursorTop += height;
       if (0 == dimensions_.offset) {
         dimensions_.screenTop += height;
@@ -301,7 +302,6 @@ void Screen::pushBack(rune::Rune && rune) {
       } else {
         dimensions_.offset -= height;
       }
-
       return;
 
     default:
@@ -359,18 +359,16 @@ void Screen::swapBuffers() {
 
 void Screen::dimensions() {
   freetype::Face & face = font_.regular();
-  dimensions_.glyphAscender = face.ascender();
   dimensions_.glyphDescender = face.descender();
   dimensions_.lineHeight = face.lineHeight();
   dimensions_.glyphWidth = face.glyphWidth();
 }
 
 void Screen::setCursor(uint16_t column, uint16_t line) {
-#if 0
-  column = std::min(column, static_cast<uint16_t>(dimensions_.columns() - 1));
-  line = std::min(line, static_cast<uint16_t>(dimensions_.lines() - 1));
-#endif
-
+  assert(0 < column);
+  assert(dimensions_.columns() > column);
+  assert(0 < line);
+  assert(dimensions_.lines() > line);
   dimensions_.column = column;
   dimensions_.line = line;
   dimensions_.cursorLeft = dimensions_.columnToPixel(column);
@@ -399,43 +397,6 @@ void Screen::endSelection() {
 }
 
 void Screen::drag(const uint16_t x, const uint16_t y) {
-  if (0 > x || x > dimensions_.surfaceWidth ||
-      0 > y || y > dimensions_.surfaceHeight) {
-    return;
-  }
-  const uint16_t pointerColumn = x / dimensions_.glyphWidth + 1;
-  const uint16_t pointerLine = dimensions_.pixelToLine(y);
-  bool change = false;
-  if (pointerColumn != dimensions_.pointerColumn) {
-    change = true;
-    dimensions_.pointerColumn = pointerColumn;
-  }
-  if (pointerLine != dimensions_.pointerLine) {
-    change = true;
-    dimensions_.pointerLine = pointerLine;
-  }
-  if (change) {
-    rune::Rune rune = buffer_.get(pointerLine, pointerColumn);
-
-    if (rune.iscontrol()) {
-      rune.character = L' ';
-    }
-
-    const Rectangle rectangle{
-      .x = dimensions_.columnToPixel(pointerColumn),
-      .y = dimensions_.lineToPixel(pointerLine),
-      .width = dimensions_.glyphWidth,
-      .height = dimensions_.lineHeight};
-
-    rune.backgroundColor = Color{0.3f, 0.f, 0.3f, 1.f};
-
-    {
-      auto drawer = framebuffer_.draw();
-      rectangles_.emplace_back(printCharacter(drawer, rectangle, rune));
-    }
-
-    repaint_ = SCROLL;
-  }
 }
 
 void Screen::select(const Rectangle & rectangle) {
@@ -625,4 +586,21 @@ bool Framebuffer::paintFrame(const uint16_t frame) {
 
   glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
   return true;
+}
+
+void Screen::backspace() {
+  const Rectangle rectangle{
+    .x = dimensions_.cursorLeft,
+    .y = static_cast<int32_t>(dimensions_.cursorTop),
+    .width = dimensions_.glyphWidth,
+    .height = dimensions_.lineHeight};
+
+  auto drawer = framebuffer_.draw();
+
+  drawer(rectangle);
+
+  --dimensions_.column;
+}
+
+void Screen::clear() {
 }

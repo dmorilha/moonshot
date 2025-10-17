@@ -130,6 +130,8 @@ std::unique_ptr<Terminal> Terminal::New(Screen * const screen) {
 
   struct termios flags;
   tcgetattr(instance->fd_.child, &flags);
+  // flags.c_oflag ^= ONLCR; // we might need this
+  tcsetattr(instance->fd_.child, 0, &flags);
 
   instance->pid_ = fork();
   if (0 == instance->pid_) { /* CHILD */

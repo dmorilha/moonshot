@@ -69,16 +69,20 @@ struct Screen {
 
   void changeScrollY(const int32_t);
   void changeScrollX(const int32_t);
-  void resetScroll() { dimensions_.scrollX = dimensions_.scrollY = 0; }
+  void resetScroll() { dimensions_.scrollY = 0; }
 
   int32_t getColumns() const { return dimensions_.columns(); }
   int32_t getLines() const { return dimensions_.lines(); }
+  int32_t getColumn() const { return dimensions_.column; }
+  int32_t getLine() const { return dimensions_.line; }
 
   void decreaseFontSize() { font_.decreaseSize(); dimensions(); }
   void increaseFontSize() { font_.increaseSize(); dimensions(); }
 
-  void clear();
   void pushBack(rune::Rune &&);
+
+  void clear();
+  void backspace();
   void repaint();
   void resize(int32_t, int32_t);
   void setCursor(uint16_t, uint16_t);

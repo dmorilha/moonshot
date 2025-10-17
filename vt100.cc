@@ -1,5 +1,6 @@
 #include <algorithm>
 #include <iostream>
+#include <sstream>
 #include <vector>
 
 #include <cassert>
@@ -40,7 +41,7 @@ void vt100::handleDecMode(const unsigned int code, const bool mode) {
   switch (code) {
   case 1:
     /* decckm */
-    assert(!"UNIMPLEMENTED");
+    // application keypad cursor
     break;
 
   case 3:
@@ -236,8 +237,7 @@ void vt100::handleDecMode(const unsigned int code, const bool mode) {
   case 47: /* use alternate screen buffer, xterm */
   case 1047: /* use alternate screen buffer, xterm */
   case 1049:
-    /* after saving the cursor, switch to the alternate scree buffer, clearing it first */
-    assert(!"UNIMPLEMENTED");
+    /* after saving the cursor, switch to the alternate screen buffer, clearing it first */
     break;
 
   case 1051:
@@ -272,6 +272,7 @@ void vt100::handleDecMode(const unsigned int code, const bool mode) {
 
   case 2004:
     /* bracketed paste */
+    // self->modes.bracketed_paste = mode;
     break;
 
   case 2026:
@@ -366,7 +367,9 @@ void vt100::handleSGRCommand(const int command) {
 
   case 24:
     /* not underlined, ecma 48, 3rd */
-    assert(!"UNIMPLEMENTED");
+    // r->underlined = false;
+    // r->curlyunderline = false;
+    // r->doubleunderline = false;
     break;
 
   case 25:
@@ -376,7 +379,7 @@ void vt100::handleSGRCommand(const int command) {
 
   case 27:
     /* positive (not inverse), ecma 48 3rd */
-    assert(!"UNIMPLEMENTED");
+    // r->invert = false;
     break;
 
   case 28:
@@ -391,10 +394,17 @@ void vt100::handleSGRCommand(const int command) {
 
   case 30 ... 37:
     /* set fg color palette */
-    std::cout << "set fg color " << command << std::endl;
-    runeFactory_.hasForegroundColor = true;
-    runeFactory_.foregroundColor = Colors.find(command)->second;
-    // assert(!"UNIMPLEMENTED");
+    {
+      const auto iterator = Colors.find(command);
+      if (Colors.cend() != iterator) {
+        runeFactory_.hasForegroundColor = true;
+        runeFactory_.foregroundColor = iterator->second;
+      }
+    }
+    break;
+
+  case 38:
+    /* foreground color */
     break;
 
   case 39:
@@ -404,9 +414,17 @@ void vt100::handleSGRCommand(const int command) {
 
   case 40 ... 47:
     /* set background color to default, ecma 48 3rd */
-    std::cout << "set bg color " << command << std::endl;
-    runeFactory_.hasBackgroundColor = true;
-    // assert(!"UNIMPLEMENTED");
+    {
+      const auto iterator = Colors.find(command);
+      if (Colors.cend() != iterator) {
+        runeFactory_.hasBackgroundColor = true;
+        runeFactory_.backgroundColor = iterator->second;
+      }
+    }
+    break;
+
+  case 48:
+    /* background color */
     break;
 
   case 49:
@@ -451,12 +469,14 @@ void vt100::handleSGRCommand(const int command) {
 
   case 90 ... 97:
     /* set fg color palette */
-    assert(!"UNIMPLEMENTED");
+    handleSGRCommand(command - 60);
+    // assert(!"UNIMPLEMENTED");
     break;
 
   case 100 ... 107:
     /* set background color palette */
-    assert(!"UNIMPLEMENTED");
+    handleSGRCommand(command - 60);
+    // assert(!"UNIMPLEMENTED");
     break;
 
   default:
@@ -490,6 +510,11 @@ void vt100::handleSGR() {
       }
     }
     assert(!codes.empty());
+  }
+
+  /* requires a color parser */
+  if (0 == strcmp("38", codes[0]) || 0 == strcmp("48", codes[0])) {
+    return;
   }
 
   for (const char * const code : codes) {
@@ -611,7 +636,7 @@ void vt100::handleCSI(const char c) {
 
       case 'K':
         /* EL - clear(erase) line right of cursor */
-        // assert(!"UNIMPLEMENTED");
+        screen_->backspace();
         break;
 
       case '@':
@@ -677,8 +702,9 @@ void vt100::handleCSI(const char c) {
 
       case 'J':
         /* ED - erase display */
-        // assert(!"UNIMPLEMENTED");
-        screen_->clear();
+        if (2 == escapeSequence_.size()) {
+          screen_->clear();
+        }
         break;
 
       case 'd':
@@ -686,10 +712,33 @@ void vt100::handleCSI(const char c) {
         assert(!"UNIMPLEMENTED");
         break;
 
-      case 'r':
-        /* DECSTBM - set scroll region */
-        assert(!"UNIMPLEMENTED");
-        break;
+      case 'r': {
+          /* DECSTBM - set scroll region */
+          //TODO: make a function
+          int64_t top = 1, bottom = 1;
+          if ('r' != escapeSequence_.front()) {
+            std::istringstream stream{
+              std::string{escapeSequence_.begin(), escapeSequence_.end()}};
+            stream >> top;
+            char delimiter;
+            stream >> delimiter;
+            assert(';' == delimiter);
+            stream >> bottom;
+            top = std::max<int64_t>(1, top);
+            bottom = 1 > bottom ? screen_->getLines() - 1 : bottom;
+            --top;
+            --bottom;
+            std::cout << top << ", " << bottom << std::endl;
+          } else {
+            assert(!"unimplemented");
+          }
+
+          if (bottom > top) {
+            screen_->setCursor(0, 0);
+          } else {
+            assert(!"invalid DECSTBM sequence");
+          }
+        } break;
 
       case 'I':
         /* CHT - cursor forward Ps tabulations */
@@ -725,13 +774,21 @@ void vt100::handleCSI(const char c) {
         {
           /* CUP - move cursor to Px, Py */
           uint16_t column = 1, line = 1;
-          if (2 == escapeSequence_.size()) {
-            screen_->setCursor(column, line);
-          } else {
-            assert(!"UNIMPLEMENTED");
+          if (2 < escapeSequence_.size()) {
+            std::istringstream stream{
+              std::string{escapeSequence_.begin(), escapeSequence_.end()}};
+            stream >> column;
+            char delimiter;
+            stream >> delimiter;
+            assert(';' == delimiter);
+            stream >> line;
+            column = std::max<int64_t>(1, column);
+            line = std::max<int64_t>(1, line);
+            assert(screen_->getLines() >= line);
+            assert(screen_->getColumns() >= column);
           }
-        }
-        break;
+          screen_->setCursor(column, line);
+        } break;
 
       case 'c':
         /* report vt340 type device with sixel */
@@ -740,8 +797,11 @@ void vt100::handleCSI(const char c) {
 
       case 'n':
         /* DSR - device status report */
-        assert(!"UNIMPLEMENTED");
-        break;
+        {
+          int32_t argument = 1; 
+          argument = std::atoi(escapeSequence_.data());
+          reportDeviceStatus(argument);
+        } break;
 
       case 'M':
         /* DL - delete lines */
@@ -1076,3 +1136,16 @@ void vt100::handleCharacter(const char c) {
     break;
   }
 }
+
+void vt100::reportDeviceStatus(const int32_t argument) {
+  switch (argument) {
+  case 6:
+    std::cout << screen_->getColumn() << " " << screen_->getLine() << std::endl;
+    // I don't know what should be done here.
+    break;
+  default:
+    assert(!"UNIMPLEMENTED");
+    break;
+  }
+}
+
