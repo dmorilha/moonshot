@@ -1,86 +1,106 @@
 #pragma once
 
 #include <cmath>
-#include <iostream>
 
 #include <cassert>
 
 #include "types.h"
 
-/*
- * move offset within
- * pointer line/column can be relative to view port or absolute
- */
-
 struct Dimensions {
-  uint16_t column = 1;
-  uint16_t line = 1;
+  // current font metrics
+  int16_t glyph_descender = 0;
+  uint16_t glyph_width = 0;
+  uint16_t line_height = 0;
 
-  // blank space when not all lines are filled measured in pixels
-  uint16_t offset = 0;
+  // the next character will be displayed at
+  uint16_t cursor_column = 1; // 65k, it goes 1 up to a ... ~thousand
+  uint16_t cursor_line = 1; // 65k, it goes 1 up to a ... ~thousand
 
-  uint16_t cursorLeft = 0;
-  uint16_t cursorTop = 0;
+  uint16_t surface_height = 0; // is it pixels?
+  uint16_t surface_width = 0; // is it pixels?
 
-  // how many pixels it scrolled bottom up
-  uint32_t scrollY = 0;
+  uint64_t scroll_y = 0; // is it pixels?
 
-  uint16_t surfaceHeight = 0;
-  uint16_t surfaceWidth = 0;
+  uint16_t displayed_lines = 0; //65k it goes 1 up to a ... ~thousand
+  uint64_t scrollback_lines = 0; //the sky (and memory) is the limit really.
 
-  // total number of lines
-  uint64_t totalLines = 1;
+  Dimensions() = default;
+  Dimensions(const Dimensions &) = default;
+  Dimensions(Dimensions &&) = delete;
+  Dimensions & operator = (const Dimensions &) = default;
+  Dimensions & operator = (Dimensions &&) = delete;
 
-  // padding (not used)
-  uint16_t leftPadding = 0;
-  uint16_t bottomPadding = 0;
+  constexpr bool new_line() {
+    bool result = lines() > cursor_line;
+    if (result) {
+      cursor_line += 1;
+      if (displayed_lines < cursor_line) {
+        displayed_lines = cursor_line;
+      }
+    } else {
+      scrollback_lines += 1;
+    }
+    return result;
+  }
 
-  // font related dimensions
-  int16_t glyphDescender = 0;
-  uint16_t lineHeight = 0;
-  uint16_t glyphWidth = 0;
-  uint32_t screenTop = 0;
+  constexpr float scale_height() const {
+    assert(0 < surface_height);
+    return 2.f / surface_height;
+  }
 
-  Rectangle selection = {0, 0, 0, 0};
+  constexpr float scale_width() const {
+    assert(0 < surface_width);
+    return 2.f / surface_width;
+  }
 
   constexpr uint16_t columns() const {
-    return std::floor((surfaceWidth - leftPadding * 2) / glyphWidth);
+    assert(0 < surface_width);
+    assert(0 < glyph_width);
+    assert(glyph_width < surface_width);
+    return std::ceil(surface_width / glyph_width);
   }
 
   constexpr uint16_t lines() const {
-    return std::floor((surfaceHeight - bottomPadding * 2) / lineHeight);
+    assert(0 < surface_height);
+    assert(0 < line_height);
+    assert(line_height < surface_height);
+    return std::ceil(surface_height / line_height);
   }
 
-  constexpr float scaleHeight() const {
-    return 2.f / surfaceHeight;
-  }
-
-  constexpr float scaleWidth() const {
-    return 2.f / surfaceWidth;
-  }
-
-  // scrollback buffer
-  constexpr uint64_t bufferLines() const {
-    return std::max<int64_t>(0, totalLines - lines());
-  }
-
-  constexpr uint16_t pixelToLine(const uint16_t y) const {
-    return (screenTop - scrollY + y) / lineHeight + 1;
-  }
-
-  constexpr int32_t lineToPixel(const uint16_t line) const {
+  constexpr uint64_t line_to_pixel(const uint64_t line) const {
+    assert(0 < line_height);
     assert(0 < line);
-    return (line - 1) * lineHeight;
+    return (line - 1) * line_height;
   }
 
-  constexpr int32_t columnToPixel(const uint16_t column) const {
+  constexpr int32_t column_to_pixel(const uint16_t column) const {
+    assert(0 < glyph_width);
     assert(0 < column);
-    return (column - 1) * glyphWidth;
+    return (column - 1) * glyph_width;
+  }
+  
+  constexpr void set_cursor(const uint16_t column, const uint16_t line) {
+    assert(0 < column);
+    assert(columns() > column);
+    assert(0 < line);
+    assert(lines() > line);
+    cursor_column = column;
+    cursor_line = line;
+  }
+
+  constexpr operator Rectangle_Y () {
+    assert(0 < glyph_width);
+    assert(0 < cursor_line);
+    assert(0 < line_height);
+    assert(0 < cursor_column);
+
+    return {
+      .x = column_to_pixel(cursor_column),
+      .y = line_to_pixel(scrollback_lines + cursor_line),
+      .width = glyph_width,
+      .height = line_height,
+    };
   }
 
   friend std::ostream & operator << (std::ostream &, const Dimensions &);
-
-  Dimensions & operator = (const Dimensions &) = default;
-  Dimensions(const Dimensions &) = default;
-  Dimensions() = default;
 };

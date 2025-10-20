@@ -102,7 +102,6 @@ Screen Screen::New(const wayland::Connection & connection, Font && font) {
   location.vpos2 = glGetAttribLocation(glProgram2, "vPos");
 
   screen.dimensions();
-  screen.dimensions_.offset = screen.dimensions_.surfaceHeight - screen.dimensions_.lineHeight;
 
   return screen;
 }
@@ -121,11 +120,13 @@ Screen::Screen(std::unique_ptr<wayland::Surface> && surface, Font && font) : sur
   surface_->onResize = std::bind_front(&Screen::resize, this);
 }
 
-void Screen::resize(int32_t width, int32_t height) {
+void Screen::resize(uint16_t width, uint16_t height) {
+  assert(0 < width);
+  assert(0 < height);
   dimensions();
-  dimensions_.surfaceWidth = width;
-  dimensions_.surfaceHeight = height;
-  opengl::clear(dimensions_.surfaceWidth, dimensions_.surfaceHeight, color::black);
+  dimensions_.surface_width = width;
+  dimensions_.surface_height = height;
+  opengl::clear(dimensions_.surface_width, dimensions_.surface_height, color::black);
   surface_->egl().swapBuffers();
 
   framebuffer_.resize(width, height);
@@ -142,6 +143,7 @@ void Screen::resize(int32_t width, int32_t height) {
 Screen::Screen(Screen && other) : surface_(std::move(other.surface_)), font_(std::move(other.font_)) { }
 
 void Screen::changeScrollY(const int32_t value) {
+  #if 0
   int64_t scrollY = 0;
   // screen top might be more than what framebuffer contains
   if (0 < dimensions_.screenTop) {
@@ -152,22 +154,24 @@ void Screen::changeScrollY(const int32_t value) {
       scrollY = dimensions_.screenTop - 1;
     }
   } else {
-    dimensions_.scrollY = 0;
+    dimensions_.scroll_y = 0;
   }
-  assert(0 <= scrollY);
-  if (dimensions_.scrollY != scrollY) {
-    dimensions_.scrollY = static_cast<uint32_t>(scrollY);
+  assert(0 <= scroll_y);
+  if (dimensions_.scroll_y != scroll_y) {
+    dimensions_.scroll_y = static_cast<uint32_t>(scroll_y);
   }
+  repaint_ = SCROLL;
+  #endif
+  dimensions_.scroll_y += 2 * value;
   repaint_ = SCROLL;
 }
 
 void Screen::draw() {
-  if (0 == dimensions_.surfaceHeight || 0 == dimensions_.surfaceWidth) {
-    return;
-  }
+  assert(0 < dimensions_.surface_height);
+  assert(0 < dimensions_.surface_width);
 }
 
-Rectangle Screen::printCharacter(Framebuffer::Draw & drawer, const Rectangle & rectangle, rune::Rune rune) {
+Rectangle Screen::printCharacter(Framebuffer::Draw & drawer, const Rectangle_Y & rectangle, rune::Rune rune) {
   if (rune.iscontrol()) {
     switch (rune.character) {
     case L'\t':
@@ -196,12 +200,13 @@ Rectangle Screen::printCharacter(Framebuffer::Draw & drawer, const Rectangle & r
     break;
   }
 
-  Rectangle target = drawer(rectangle, rune.backgroundColor);
+  const Rectangle target = drawer(rectangle, rune.backgroundColor);
 
-  const float vertex_bottom = framebuffer_.scaleHeight() * (target.y + glyph.top - (dimensions_.glyphDescender + glyph.height));
-  const float vertex_left = framebuffer_.scaleWidth() * (target.x + glyph.left);
-  const float vertex_right = framebuffer_.scaleWidth() * (target.x + glyph.left + glyph.width);
-  const float vertex_top = framebuffer_.scaleHeight() * (target.y + glyph.top - dimensions_.glyphDescender);
+  // assert(0 < dimensions_.glyph_descender);
+  const float vertex_bottom = framebuffer_.scale_height() * (target.y + glyph.top - (dimensions_.glyph_descender + glyph.height));
+  const float vertex_left = framebuffer_.scale_width() * (target.x + glyph.left);
+  const float vertex_right = framebuffer_.scale_width() * (target.x + glyph.left + glyph.width);
+  const float vertex_top = framebuffer_.scale_height() * (target.y + glyph.top - dimensions_.glyph_descender);
 
   const float vertices[4][4] = {
     // vertex a - left top
@@ -258,12 +263,13 @@ Rectangle Screen::printCharacter(Framebuffer::Draw & drawer, const Rectangle & r
 }
 
 void Screen::pushBack(rune::Rune && rune) {
-  // original 
-  buffer_.pushBack(std::move(rune));
+  // buffer_.pushBack(std::move(rune));
   repaint_ = DRAW;
 
-  uint16_t height = dimensions_.lineHeight;
-  uint16_t width = dimensions_.glyphWidth;
+  assert(0 < dimensions_.line_height);
+  uint16_t height = dimensions_.line_height;
+  assert(0 < dimensions_.glyph_width);
+  uint16_t width = dimensions_.glyph_width;
   uint8_t tab = 1;
   if (rune.iscontrol()) {
     switch (rune.character) {
@@ -272,36 +278,22 @@ void Screen::pushBack(rune::Rune && rune) {
       return;
 
     case L'\b':
-      --dimensions_.column;
-      dimensions_.cursorLeft -= width;
+      assert(1 < dimensions_.cursor_column);
+      --dimensions_.cursor_column;
       return;
 
     case L'\t': // horizontal tab
-      tab = 8 - (dimensions_.column % 8);
+      tab = 8 - (dimensions_.cursor_column % 8);
       width *= tab;
       rune.character = L' ';
       break;
 
     case L'\r': // carriage return
-      dimensions_.column = 0;
-      dimensions_.cursorLeft = 0;
+      dimensions_.cursor_column = 1;
       return;
 
     case L'\n': // new line
-      dimensions_.totalLines += 1;
-      if (dimensions_.line < dimensions_.lines() - 1) {
-        dimensions_.line += 1;
-      }
-      dimensions_.cursorTop += height;
-      if (0 == dimensions_.offset) {
-        dimensions_.screenTop += height;
-        repaintFull_ = true;
-      } else if (dimensions_.offset < height) {
-        dimensions_.screenTop = height - dimensions_.offset;
-        dimensions_.offset = 0;
-      } else {
-        dimensions_.offset -= height;
-      }
+      dimensions_.new_line();
       return;
 
     default:
@@ -309,36 +301,41 @@ void Screen::pushBack(rune::Rune && rune) {
     }
   }
 
-  const Rectangle rectangle{
-    .x = dimensions_.cursorLeft,
-    .y = static_cast<int32_t>(dimensions_.cursorTop),
-    .width = width,
-    .height = height};
+  Rectangle_Y rectangle = dimensions_;
+  rectangle.width = width;;
 
   {
     auto drawer = framebuffer_.draw();
     rectangles_.emplace_back(printCharacter(drawer, rectangle, rune));
   }
 
-  dimensions_.cursorLeft += width;
-  dimensions_.column += tab;
+  dimensions_.cursor_column += tab;
+  assert(dimensions_.columns() >= dimensions_.cursor_column);
 }
 
 void Screen::repaint() {
-  if (0 >= dimensions_.surfaceHeight || 0 >= dimensions_.surfaceWidth) {
-    return;
-  }
+  assert(0 < dimensions_.surface_height);
+  assert(0 < dimensions_.surface_width);
 
   //TODO: make sure there is no parallel execution here.
   if (NO != repaint_) {
-    glViewport(0, 0, dimensions_.surfaceWidth, dimensions_.surfaceHeight);
+    glViewport(0, 0, dimensions_.surface_width, dimensions_.surface_height);
 
     if (repaintFull_) {
-      opengl::clear(dimensions_.surfaceWidth, dimensions_.surfaceHeight, color::black);
+      opengl::clear(dimensions_.surface_width, dimensions_.surface_height, color::black);
     }
 
-    // framebuffer_.paintFrame(0);
-    framebuffer_.repaint(dimensions_.offset, dimensions_.scrollY);
+#if 1
+    framebuffer_.repaint({
+      .x = 0,
+      .y = dimensions_.line_to_pixel(dimensions_.scrollback_lines + 1) - dimensions_.scroll_y,
+      .width = dimensions_.surface_width,
+      .height = dimensions_.surface_height,
+    });
+#else
+    framebuffer_.paintFrame(0);
+#endif
+
     swapBuffers();
   }
   repaint_ = NO;
@@ -359,38 +356,19 @@ void Screen::swapBuffers() {
 
 void Screen::dimensions() {
   freetype::Face & face = font_.regular();
-  dimensions_.glyphDescender = face.descender();
-  dimensions_.lineHeight = face.lineHeight();
-  dimensions_.glyphWidth = face.glyphWidth();
+  dimensions_.glyph_descender = face.descender();
+  // assert(0 < dimensions_.glyph_descender);
+  dimensions_.line_height = face.lineHeight();
+  assert(0 < dimensions_.line_height);
+  dimensions_.glyph_width = face.glyphWidth();
+  assert(0 < dimensions_.glyph_width);
 }
 
 void Screen::setCursor(uint16_t column, uint16_t line) {
-  assert(0 < column);
-  assert(dimensions_.columns() > column);
-  assert(0 < line);
-  assert(dimensions_.lines() > line);
-  dimensions_.column = column;
-  dimensions_.line = line;
-  dimensions_.cursorLeft = dimensions_.columnToPixel(column);
-  dimensions_.cursorTop = dimensions_.lineToPixel(line);
+  dimensions_.set_cursor(column, line);
 }
-
-#if 0
-void Screen::setPosition(const uint16_t x, const uint16_t y) {
-  assert(x <= dimensions_.surfaceWidth);
-  assert(y <= dimensions_.surfaceHeight);
-  dimensions_.column = x / dimensions_.glyphWidth;
-  dimensions_.cursorLeft = dimensions_.column * dimensions_.glyphWidth;
-  dimensions_.line = y / dimensions_.lineHeight + 1;
-  dimensions_.cursorTop = dimensions_.screenTop + dimensions_.line * dimensions_.lineHeight;
-}
-#endif
 
 void Screen::startSelection(uint16_t x, uint16_t y) {
-  assert(x <= dimensions_.surfaceWidth);
-  assert(y <= dimensions_.surfaceHeight);
-  dimensions_.selection.x = x;
-  dimensions_.selection.y = y;
 }
 
 void Screen::endSelection() {
@@ -421,16 +399,16 @@ uint32_t Framebuffer::height() const {
   return result;
 }
 
-Rectangle Framebuffer::Draw::operator () (Rectangle rectangle, const Color & color) {
-  assert(framebuffer_.height_ >= rectangle.height
-      && framebuffer_.width_ >= rectangle.width);
+Rectangle Framebuffer::Draw::operator () (Rectangle_Y rectangle, const Color & color) {
+  assert(framebuffer_.height_ >= rectangle.height);
+  assert(framebuffer_.width_ >= rectangle.width);
   framebuffer_.update(rectangle);
   glEnable(GL_SCISSOR_TEST);
   glScissor(rectangle.x, rectangle.y, rectangle.width, rectangle.height);
   glClearColor(color.red, color.green, color.blue, color.alpha);
   glClear(GL_COLOR_BUFFER_BIT);
   glDisable(GL_SCISSOR_TEST);
-  return Rectangle{rectangle.x, rectangle.y, rectangle.width, rectangle.height};
+  return static_cast<Rectangle>(rectangle);
 }
 
 void Framebuffer::resize(const uint16_t width, const uint16_t height) {
@@ -440,13 +418,16 @@ void Framebuffer::resize(const uint16_t width, const uint16_t height) {
   current_ = container_.end();
 }
 
-void Framebuffer::update(Rectangle & rectangle) {
+void Framebuffer::update(Rectangle_Y & rectangle) {
   bool found = false;
 
   // cache hit, skip a look-up
   if (container_.end() != current_ && current_->area.y <= rectangle.y && current_->area.y + height_ >= rectangle.y + rectangle.height) {
     // grow current framebuffer area height.
-    current_->area.height = std::max(current_->area.height, rectangle.y + rectangle.height - current_->area.y);
+    const uint64_t new_height = rectangle.y + rectangle.height - current_->area.y;
+    if (current_->area.height < new_height) {
+      current_->area.height = new_height;
+    }
     found = true;
 
   // cache miss
@@ -459,7 +440,10 @@ void Framebuffer::update(Rectangle & rectangle) {
         // can't grow a previously full buffer
         assert(iterator->area.y + height_ >= rectangle.y + rectangle.height);
         current_ = iterator;
-        current_->area.height = std::max(current_->area.height, rectangle.y + rectangle.height - current_->area.y);
+        const uint64_t new_height = rectangle.y + rectangle.height - current_->area.y;
+        if (current_->area.height < new_height) {
+          current_->area.height = new_height;
+        }
         found = true;
         break;
       }
@@ -473,76 +457,153 @@ void Framebuffer::update(Rectangle & rectangle) {
       container_.pop_front();
     }
 #if DEBUG
-    const Color color{.red = drand48(), .green = drand48(), .blue = drand48(), .alpha = 1.f};
+    const Color color{
+      .red = static_cast<float>(drand48()),
+      .green = static_cast<float>(drand48()),
+      .blue = static_cast<float>(drand48()),
+      .alpha = 1.f};
 #else
     const Color color = color::black;
 #endif
     current_ = container_.emplace(container_.end(), Entry{
       .framebuffer = opengl::Framebuffer::New(width_, height_, color),
-      .area{.x = 0, .y = rectangle.y, .width = rectangle.width, .height = rectangle.height,}});
+      .area{
+        .x = 0,
+        .y = rectangle.y,
+        .width = width_, /* broken */
+        .height = rectangle.height,
+        }});
     current_->framebuffer.bind();
   }
   rectangle.y = height_ - (rectangle.y - current_->area.y) - rectangle.height;
 }
 
-void Framebuffer::repaint(const uint16_t offset, uint32_t scroll) {
-  assert((0 <= offset && 0 == scroll) || (0 == offset && 0 <= scroll));
-  uint32_t y = 0;
-  const auto END = container_.rend();
-  auto iterator = container_.rbegin();
-  for (; END != iterator && height_ >= y + offset; ++iterator) {
-    if (iterator->area.height <= scroll) {
-      scroll -= iterator->area.height;
-      continue;
-    }
-    const auto read = iterator->framebuffer.read();
+void Framebuffer::repaint(const Rectangle_Y rectangle) {
+  const float scale_height = 2.f / (45 * 23);
+  assert(0 == rectangle.x);
+  assert(width_ >= rectangle.width);
+  const uint64_t height = rectangle.y + rectangle.height;
+  const auto END = container_.end();
 
-    const uint32_t height = 0 < scroll ? iterator->area.height - scroll : iterator->area.height;
-    uint16_t difference = 0;
+  for (auto iterator = container_.begin(); END != iterator; ++iterator) {
+    if (rectangle.y > iterator->area.y && rectangle.y <= iterator->area.y + iterator->area.height) {
+      const uint16_t difference = rectangle.y - iterator->area.y;
 
-    if (iterator->area.height + y + offset > height_) {
-      difference = height_ - iterator->area.height;
-    }
+      // from
+      const float w1 = 0;
+      float w2 = iterator->area.width;
+      w2 /= std::min(iterator->area.width, rectangle.width);
+      float z1 = difference;
+      z1 /= height_;
+      const float z2 = 0;
 
-    const float vertices[4][4] = {
-      // vertex a - left top
-      { -1.f, -1.f + (2.f / height_ * (height + offset + difference)), 0, 0 == y ? 1.f : 1.f - (1.f / height_ * (y - difference)), },
-      // vertex b - right top
-      { 1.f, -1.f + (2.f / height_ * (height + offset + difference)), 1, 0 == y ? 1.f : 1.f - (1.f / height_ * (y - difference)), },
-      // vertex c - right bottom
-      { 1.f, -1.f + (2.f / height_ * (y + offset)), 1, 1.f - (1.f / height_ * height)},
-      // vertex d - left bottom
-      { -1.f, -1.f + (2.f / height_ * (y + offset)), 0, 1.f - (1.f / height_ * height)},
-    }; 
+      // to
+      const uint16_t x1 = iterator->area.x;
+      const uint16_t x2 = x1 + std::min(iterator->area.width, rectangle.width);
+      const uint16_t y1 = 0;
+      const uint16_t y2 = std::min<int32_t>(height_ - difference, rectangle.height);
+
+      const float vertices[4][4] = {
+        // vertex a - left top
+        { -1 + scale_width() * x1,  1 - scale_height * y1, w1, 1 - z1, },
+        // vertex b - right top
+        { -1 + scale_width() * x2,  1 - scale_height * y1, w2, 1 - z1, },
+        // vertex c - right bottom
+        { -1 + scale_width() * x2,  1 - scale_height * y2, w2, z2, },
+        // vertex d - left bottom
+        { -1 + scale_width() * x1,  1 - scale_height * y2, w1, z2, },
+      }; 
 
 #if 0
-    for (int i = 0; i < 4; ++i) {
-      for (int j = 0; j < 4; ++j) {
-        std::cout << vertices[i][j] << ", ";
+      for (int i = 0; i < 4; ++i) {
+        for (int j = 0; j < 4; ++j) {
+          std::cout << vertices[i][j] << ". ";
+        }
+        std::cout << std::endl;
       }
       std::cout << std::endl;
+#endif
+      {
+        const auto read = iterator->framebuffer.read();
+
+        GLuint vertex_buffer = 0;
+        glGenBuffers(1, &vertex_buffer);
+        glBindBuffer(GL_ARRAY_BUFFER, vertex_buffer);
+        glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
+
+        assert(0 < glProgram2);
+        glUseProgram(glProgram2);
+
+        assert(0 <= location.texture2);
+        glUniform1i(location.texture2, 0);
+
+        assert(0 <= location.vpos2);
+        glEnableVertexAttribArray(location.vpos2);
+        glVertexAttribPointer(location.vpos2, 4, GL_FLOAT, GL_FALSE, sizeof(vertices[0]), nullptr);
+
+        glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
+      }
     }
-    std::cout << std::endl;
+  }
+
+  for (auto iterator = container_.begin(); END != iterator; ++iterator) {
+    if (rectangle.y <= iterator->area.y && height >= iterator->area.y) {
+      // from
+      const float w1 = 0;
+      float w2 = iterator->area.width;
+      w2 /= std::min(iterator->area.width, rectangle.width);
+      const float z1 = 1;
+      float z2 = std::min(iterator->area.height, rectangle.height);
+      z2 /= height_;
+
+      // to
+      const uint16_t x1 = iterator->area.x;
+      const uint16_t x2 = x1 + std::min(iterator->area.width, rectangle.width);
+      const uint16_t y1 = iterator->area.y - rectangle.y;
+      const uint16_t y2 = y1 + std::min(iterator->area.height, rectangle.height);
+
+      const float vertices[4][4] = {
+        // vertex a - left top
+        { -1 + scale_width() * x1,  1 - scale_height * y1, w1, z1, },
+        // vertex b - right top
+        { -1 + scale_width() * x2,  1 - scale_height * y1, w2, z1, },
+        // vertex c - right bottom
+        { -1 + scale_width() * x2,  1 - scale_height * y2, w2, 1 - z2, },
+        // vertex d - left bottom
+        { -1 + scale_width() * x1,  1 - scale_height * y2, w1, 1 - z2, },
+      }; 
+
+#if 0
+      for (int i = 0; i < 4; ++i) {
+        for (int j = 0; j < 4; ++j) {
+          std::cout << vertices[i][j] << "; ";
+        }
+        std::cout << std::endl;
+      }
+      std::cout << std::endl;
 #endif
 
-    GLuint vertex_buffer = 0;
-    glGenBuffers(1, &vertex_buffer);
-    glBindBuffer(GL_ARRAY_BUFFER, vertex_buffer);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
+      {
+        const auto read = iterator->framebuffer.read();
 
-    assert(0 < glProgram2);
-    glUseProgram(glProgram2);
+        GLuint vertex_buffer = 0;
+        glGenBuffers(1, &vertex_buffer);
+        glBindBuffer(GL_ARRAY_BUFFER, vertex_buffer);
+        glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
 
-    assert(0 <= location.texture2);
-    glUniform1i(location.texture2, 0);
+        assert(0 < glProgram2);
+        glUseProgram(glProgram2);
 
-    assert(0 <= location.vpos2);
-    glEnableVertexAttribArray(location.vpos2);
-    glVertexAttribPointer(location.vpos2, 4, GL_FLOAT, GL_FALSE, sizeof(vertices[0]), nullptr);
+        assert(0 <= location.texture2);
+        glUniform1i(location.texture2, 0);
 
-    glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
-    y += height;
-    scroll = 0;
+        assert(0 <= location.vpos2);
+        glEnableVertexAttribArray(location.vpos2);
+        glVertexAttribPointer(location.vpos2, 4, GL_FLOAT, GL_FALSE, sizeof(vertices[0]), nullptr);
+
+        glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
+      }
+    }
   }
 }
 
@@ -589,18 +650,13 @@ bool Framebuffer::paintFrame(const uint16_t frame) {
 }
 
 void Screen::backspace() {
-  const Rectangle rectangle{
-    .x = dimensions_.cursorLeft,
-    .y = static_cast<int32_t>(dimensions_.cursorTop),
-    .width = dimensions_.glyphWidth,
-    .height = dimensions_.lineHeight};
-
   auto drawer = framebuffer_.draw();
-
-  drawer(rectangle);
-
-  --dimensions_.column;
+  drawer(static_cast<Rectangle_Y>(dimensions_));
 }
 
 void Screen::clear() {
+  dimensions_.scrollback_lines += dimensions_.displayed_lines - 1;
+  dimensions_.displayed_lines = 1;
+  repaint_ = DRAW;
+  repaintFull_ = true;
 }

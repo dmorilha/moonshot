@@ -17,7 +17,7 @@ struct Framebuffer {
 private:
   struct Entry {
     opengl::Framebuffer framebuffer;
-    Rectangle area;
+    Rectangle_Y area;
   };
 
   using Container = std::list<Entry>;
@@ -25,7 +25,7 @@ private:
 public:
   struct Draw {
     ~Draw();
-    auto operator()(Rectangle, const Color & color = {0.f, 0.f, 0.f, 0.f}) -> Rectangle;
+    auto operator () (Rectangle_Y, const Color & color = {0.f, 0.f, 0.f, 0.f}) -> Rectangle;
 
   private:
     Draw(Framebuffer & framebuffer);
@@ -38,15 +38,15 @@ public:
 
   auto draw() -> Draw { return Draw(*this); }; 
   auto paintFrame(const uint16_t frame = 0) -> bool;
-  auto repaint(const uint16_t offset = 0, uint32_t scroll = 0) -> void;
+  auto repaint(const Rectangle_Y) -> void;
   auto resize(const uint16_t, const uint16_t) -> void;
   auto height() const -> uint32_t;
 
-  constexpr auto scaleHeight() -> float const { return 2.f / height_; }
-  constexpr auto scaleWidth() -> float const { return 2.f / width_; }
+  constexpr auto scale_height() -> float const { return 2.f / height_; }
+  constexpr auto scale_width() -> float const { return 2.f / width_; }
 
 private:
-  auto update(Rectangle &) -> void;
+  auto update(Rectangle_Y &) -> void;
 
   Container container_;
   Container::iterator current_ = container_.end();
@@ -69,12 +69,12 @@ struct Screen {
 
   void changeScrollY(const int32_t);
   void changeScrollX(const int32_t);
-  void resetScroll() { dimensions_.scrollY = 0; }
+  void resetScroll() { dimensions_.scroll_y = 0; }
 
   int32_t getColumns() const { return dimensions_.columns(); }
   int32_t getLines() const { return dimensions_.lines(); }
-  int32_t getColumn() const { return dimensions_.column; }
-  int32_t getLine() const { return dimensions_.line; }
+  int32_t getColumn() const { return dimensions_.cursor_column; }
+  int32_t getLine() const { return dimensions_.cursor_line; }
 
   void decreaseFontSize() { font_.decreaseSize(); dimensions(); }
   void increaseFontSize() { font_.increaseSize(); dimensions(); }
@@ -84,7 +84,7 @@ struct Screen {
   void clear();
   void backspace();
   void repaint();
-  void resize(int32_t, int32_t);
+  void resize(uint16_t, uint16_t);
   void setCursor(uint16_t, uint16_t);
   void setPosition(uint16_t, uint16_t);
   void setTitle(const std::string);
@@ -105,7 +105,7 @@ private:
 
   void select(const Rectangle & rectangle);
 
-  Rectangle printCharacter(Framebuffer::Draw & drawer, const Rectangle &, rune::Rune);
+  Rectangle printCharacter(Framebuffer::Draw & drawer, const Rectangle_Y &, rune::Rune);
 
   Screen(std::unique_ptr<wayland::Surface> &&, Font &&);
 

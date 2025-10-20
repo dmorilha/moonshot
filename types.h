@@ -1,5 +1,7 @@
 #pragma once
 
+#include <iostream>
+#include <limits>
 #include <ostream>
 
 #include <cstdint>
@@ -24,10 +26,29 @@ namespace color {
 } //end of namespace color
 
 struct Rectangle {
+  // the order of these fields cannot be changed.
   int32_t x = 0;
   int32_t y = 0;
   int32_t width = 0;
   int32_t height = 0;;
   operator const int * () const { return reinterpret_cast< const int * >(this); }
   friend std::ostream & operator << (std::ostream &, const Rectangle &);
+};
+
+struct Rectangle_Y {
+  int32_t x = 0;
+  uint64_t y = 0;
+  int32_t width = 0;
+  int32_t height = 0;;
+  operator Rectangle () const {
+    if (std::numeric_limits<int32_t>::max() < y) {
+      std::cerr << "narrowing " << y << " to an int32_t" << std::endl;
+    }
+    return Rectangle{
+      .x = x,
+      .y = static_cast<int32_t>(y),
+      .width = width,
+      .height = height,
+    };
+  }
 };
