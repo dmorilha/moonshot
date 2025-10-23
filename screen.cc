@@ -162,7 +162,7 @@ void Screen::changeScrollY(const int32_t value) {
   }
   repaint_ = SCROLL;
   #endif
-  dimensions_.scroll_y += 2 * value;
+  dimensions_.scroll_y += value;
   repaint_ = SCROLL;
 }
 
@@ -320,22 +320,30 @@ void Screen::repaint() {
   //TODO: make sure there is no parallel execution here.
   if (NO != repaint_) {
     glViewport(0, 0, dimensions_.surface_width, dimensions_.surface_height);
-
     if (repaintFull_) {
       opengl::clear(dimensions_.surface_width, dimensions_.surface_height, color::black);
     }
 
 #if 1
-    framebuffer_.repaint({
-      .x = 0,
-      .y = dimensions_.line_to_pixel(dimensions_.scrollback_lines + 1) - dimensions_.scroll_y,
-      .width = dimensions_.surface_width,
-      .height = dimensions_.surface_height,
-    });
+    uint64_t offset_y = 0;
+
+    if (0 < dimensions_.scrollback_lines) {
+      offset_y = dimensions_.scrollback_lines * dimensions_.line_height;
+      if (dimensions_.lines() <= dimensions_.displayed_lines) {
+        offset_y -= dimensions_.surface_height % dimensions_.line_height;
+      }
+      offset_y -= dimensions_.scroll_y;
+    }
+
+    framebuffer_.repaint(Rectangle{
+        .x = 0,
+        .y = 0,
+        .width = dimensions_.surface_width,
+        .height = static_cast<int32_t>(dimensions_.line_to_pixel(dimensions_.displayed_lines + 1)),
+    }, offset_y);
 #else
     framebuffer_.paintFrame(0);
 #endif
-
     swapBuffers();
   }
   repaint_ = NO;
@@ -478,40 +486,50 @@ void Framebuffer::update(Rectangle_Y & rectangle) {
   rectangle.y = height_ - (rectangle.y - current_->area.y) - rectangle.height;
 }
 
-void Framebuffer::repaint(const Rectangle_Y rectangle) {
-  const float scale_height = 2.f / (45 * 23);
+void Framebuffer::repaint(const Rectangle rectangle, const uint64_t offset_y) {
   assert(0 == rectangle.x);
   assert(width_ >= rectangle.width);
-  const uint64_t height = rectangle.y + rectangle.height;
   const auto END = container_.end();
 
+  uint16_t y = 0, height = 0;
   for (auto iterator = container_.begin(); END != iterator; ++iterator) {
-    if (rectangle.y > iterator->area.y && rectangle.y <= iterator->area.y + iterator->area.height) {
-      const uint16_t difference = rectangle.y - iterator->area.y;
+    height += iterator->area.height;
+    if (rectangle.height < height) {
+      height = rectangle.height;
+      break;
+    }
+  }
+  if (0 == height) {
+    return;
+  } else if (height_ < height) {
+    height = height_;
+  }
 
+  for (auto iterator = container_.begin(); END != iterator; ++iterator) {
+    if (offset_y > iterator->area.y && offset_y <= iterator->area.y + iterator->area.height) {
       // from
       const float w1 = 0;
       float w2 = iterator->area.width;
       w2 /= std::min(iterator->area.width, rectangle.width);
-      float z1 = difference;
+      float z1 = height_ - iterator->area.height;
+      float z2 = z1 + iterator->area.height - (offset_y - iterator->area.y);
       z1 /= height_;
-      const float z2 = 0;
-
+      z2 /= height_;
       // to
       const uint16_t x1 = iterator->area.x;
       const uint16_t x2 = x1 + std::min(iterator->area.width, rectangle.width);
-      const uint16_t y1 = 0;
-      const uint16_t y2 = std::min<int32_t>(height_ - difference, rectangle.height);
+      const uint16_t y1 = y;
+      uint16_t y2 = y1 + iterator->area.height - (offset_y - iterator->area.y);
 
       const float vertices[4][4] = {
         // vertex a - left top
-        { -1 + scale_width() * x1,  1 - scale_height * y1, w1, 1 - z1, },
+        { -1 + scale_width() * x1, 1 - scale_height() * y1, w1, z2, },
         // vertex b - right top
-        { -1 + scale_width() * x2,  1 - scale_height * y1, w2, 1 - z1, },
+        { -1 + scale_width() * x2, 1 - scale_height() * y1, w2, z2, },
         // vertex c - right bottom
-        { -1 + scale_width() * x2,  1 - scale_height * y2, w2, z2, },
+        { -1 + scale_width() * x2, 1 - scale_height() * y2, w2, z1, },
         // vertex d - left bottom
-        { -1 + scale_width() * x1,  1 - scale_height * y2, w1, z2, },
+        { -1 + scale_width() * x1, 1 - scale_height() * y2, w1, z1, },
       }; 
 
 #if 0
@@ -543,34 +561,40 @@ void Framebuffer::repaint(const Rectangle_Y rectangle) {
 
         glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
       }
+      y += y2;
     }
   }
 
   for (auto iterator = container_.begin(); END != iterator; ++iterator) {
-    if (rectangle.y <= iterator->area.y && height >= iterator->area.y) {
+    if (offset_y <= iterator->area.y && offset_y + height >= iterator->area.y) {
       // from
       const float w1 = 0;
       float w2 = iterator->area.width;
       w2 /= std::min(iterator->area.width, rectangle.width);
-      const float z1 = 1;
-      float z2 = std::min(iterator->area.height, rectangle.height);
+      float z1 = 0;
+      float z2 = std::min(iterator->area.height, height_ - y);
+      z1 /= height_;
       z2 /= height_;
+      assert(1 >= z2);
 
       // to
       const uint16_t x1 = iterator->area.x;
       const uint16_t x2 = x1 + std::min(iterator->area.width, rectangle.width);
-      const uint16_t y1 = iterator->area.y - rectangle.y;
-      const uint16_t y2 = y1 + std::min(iterator->area.height, rectangle.height);
+      const uint16_t y1 = y;
+      uint16_t y2 = y1 + iterator->area.height;
+      if (height_ < y2) {
+        y2 = height_;
+      }
 
       const float vertices[4][4] = {
         // vertex a - left top
-        { -1 + scale_width() * x1,  1 - scale_height * y1, w1, z1, },
+        { -1 + scale_width() * x1, 1 - scale_height() * y1, w1, 1 - z1, },
         // vertex b - right top
-        { -1 + scale_width() * x2,  1 - scale_height * y1, w2, z1, },
+        { -1 + scale_width() * x2, 1 - scale_height() * y1, w2, 1 - z1, },
         // vertex c - right bottom
-        { -1 + scale_width() * x2,  1 - scale_height * y2, w2, 1 - z2, },
+        { -1 + scale_width() * x2, 1 - scale_height() * y2, w2, 1 - z2, },
         // vertex d - left bottom
-        { -1 + scale_width() * x1,  1 - scale_height * y2, w1, 1 - z2, },
+        { -1 + scale_width() * x1, 1 - scale_height() * y2, w1, 1 - z2, },
       }; 
 
 #if 0
@@ -603,6 +627,7 @@ void Framebuffer::repaint(const Rectangle_Y rectangle) {
 
         glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
       }
+      y += y2;
     }
   }
 }

@@ -38,7 +38,7 @@ public:
 
   auto draw() -> Draw { return Draw(*this); }; 
   auto paintFrame(const uint16_t frame = 0) -> bool;
-  auto repaint(const Rectangle_Y) -> void;
+  auto repaint(const Rectangle, const uint64_t) -> void;
   auto resize(const uint16_t, const uint16_t) -> void;
   auto height() const -> uint32_t;
 
