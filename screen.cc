@@ -142,28 +142,19 @@ void Screen::resize(uint16_t width, uint16_t height) {
 
 Screen::Screen(Screen && other) : surface_(std::move(other.surface_)), font_(std::move(other.font_)) { }
 
-void Screen::changeScrollY(const int32_t value) {
-  #if 0
-  int64_t scrollY = 0;
-  // screen top might be more than what framebuffer contains
-  if (0 < dimensions_.screenTop) {
-    scrollY = static_cast<int64_t>(dimensions_.scrollY) + -2 * value;
-    if (0 > scrollY) {
-      scrollY = 0;
-    } else if (scrollY >= dimensions_.screenTop) {
-      scrollY = dimensions_.screenTop - 1;
+void Screen::changeScrollY(int32_t value) {
+  value *= -2;
+  // prevents unsigned from overflowing
+  if ((0 < value || dimensions_.scroll_y >= -1 * value)
+    && 0 < dimensions_.scrollback_lines) {
+    const uint64_t difference = framebuffer_.height()
+      - dimensions_.line_to_pixel(dimensions_.displayed_lines)
+      - dimensions_.surface_height % dimensions_.line_height;
+    if (difference >= dimensions_.scroll_y) {
+      dimensions_.scroll_y = std::min(difference, value + dimensions_.scroll_y);
+      repaint_ = SCROLL;
     }
-  } else {
-    dimensions_.scroll_y = 0;
   }
-  assert(0 <= scroll_y);
-  if (dimensions_.scroll_y != scroll_y) {
-    dimensions_.scroll_y = static_cast<uint32_t>(scroll_y);
-  }
-  repaint_ = SCROLL;
-  #endif
-  dimensions_.scroll_y += value;
-  repaint_ = SCROLL;
 }
 
 void Screen::draw() {
@@ -263,7 +254,9 @@ Rectangle Screen::printCharacter(Framebuffer::Draw & drawer, const Rectangle_Y &
 }
 
 void Screen::pushBack(rune::Rune && rune) {
-  // buffer_.pushBack(std::move(rune));
+#if 0
+  buffer_.pushBack(std::move(rune));
+#endif
   repaint_ = DRAW;
 
   assert(0 < dimensions_.line_height);
@@ -310,7 +303,9 @@ void Screen::pushBack(rune::Rune && rune) {
   }
 
   dimensions_.cursor_column += tab;
+#if 0
   assert(dimensions_.columns() >= dimensions_.cursor_column);
+#endif
 }
 
 void Screen::repaint() {
@@ -326,20 +321,26 @@ void Screen::repaint() {
 
 #if 1
     uint64_t offset_y = 0;
-
+    int32_t height = static_cast<int32_t>(dimensions_.line_to_pixel(dimensions_.displayed_lines + 1));
     if (0 < dimensions_.scrollback_lines) {
       offset_y = dimensions_.scrollback_lines * dimensions_.line_height;
-      if (dimensions_.lines() <= dimensions_.displayed_lines) {
+      if (dimensions_.lines() == dimensions_.displayed_lines) {
         offset_y -= dimensions_.surface_height % dimensions_.line_height;
       }
-      offset_y -= dimensions_.scroll_y;
+      if (0 < dimensions_.scroll_y) {
+        if (offset_y > dimensions_.scroll_y) {
+          offset_y -= dimensions_.scroll_y;
+        } else  {
+          offset_y = 0;
+        }
+        height = dimensions_.surface_height;
+      }
     }
-
     framebuffer_.repaint(Rectangle{
         .x = 0,
         .y = 0,
         .width = dimensions_.surface_width,
-        .height = static_cast<int32_t>(dimensions_.line_to_pixel(dimensions_.displayed_lines + 1)),
+        .height = height,
     }, offset_y);
 #else
     framebuffer_.paintFrame(0);
@@ -490,7 +491,6 @@ void Framebuffer::repaint(const Rectangle rectangle, const uint64_t offset_y) {
   assert(0 == rectangle.x);
   assert(width_ >= rectangle.width);
   const auto END = container_.end();
-
   uint16_t y = 0, height = 0;
   for (auto iterator = container_.begin(); END != iterator; ++iterator) {
     height += iterator->area.height;
@@ -520,7 +520,6 @@ void Framebuffer::repaint(const Rectangle rectangle, const uint64_t offset_y) {
       const uint16_t x2 = x1 + std::min(iterator->area.width, rectangle.width);
       const uint16_t y1 = y;
       uint16_t y2 = y1 + iterator->area.height - (offset_y - iterator->area.y);
-
       const float vertices[4][4] = {
         // vertex a - left top
         { -1 + scale_width() * x1, 1 - scale_height() * y1, w1, z2, },
@@ -541,6 +540,7 @@ void Framebuffer::repaint(const Rectangle rectangle, const uint64_t offset_y) {
       }
       std::cout << std::endl;
 #endif
+
       {
         const auto read = iterator->framebuffer.read();
 
@@ -561,12 +561,14 @@ void Framebuffer::repaint(const Rectangle rectangle, const uint64_t offset_y) {
 
         glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
       }
-      y += y2;
+      y = y2;
     }
   }
 
+  const uint64_t a = offset_y + y;
+  const uint64_t b = offset_y + height;
   for (auto iterator = container_.begin(); END != iterator; ++iterator) {
-    if (offset_y <= iterator->area.y && offset_y + height >= iterator->area.y) {
+    if (a < iterator->area.y + iterator->area.height && b > iterator->area.y) {
       // from
       const float w1 = 0;
       float w2 = iterator->area.width;
@@ -576,7 +578,6 @@ void Framebuffer::repaint(const Rectangle rectangle, const uint64_t offset_y) {
       z1 /= height_;
       z2 /= height_;
       assert(1 >= z2);
-
       // to
       const uint16_t x1 = iterator->area.x;
       const uint16_t x2 = x1 + std::min(iterator->area.width, rectangle.width);
@@ -585,7 +586,6 @@ void Framebuffer::repaint(const Rectangle rectangle, const uint64_t offset_y) {
       if (height_ < y2) {
         y2 = height_;
       }
-
       const float vertices[4][4] = {
         // vertex a - left top
         { -1 + scale_width() * x1, 1 - scale_height() * y1, w1, 1 - z1, },
@@ -627,7 +627,7 @@ void Framebuffer::repaint(const Rectangle rectangle, const uint64_t offset_y) {
 
         glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
       }
-      y += y2;
+      y = y2;
     }
   }
 }

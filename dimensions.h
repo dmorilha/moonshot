@@ -22,7 +22,7 @@ struct Dimensions {
   uint64_t scroll_y = 0; // is it pixels?
 
   uint16_t displayed_lines = 1; //65k it goes 1 up to a ... ~thousand
-  uint64_t scrollback_lines = 0; //the sky (and memory) is the limit really.
+  uint64_t scrollback_lines = 0; //memory is the limit really.
 
   Dimensions() = default;
   Dimensions(const Dimensions &) = default;
@@ -32,11 +32,8 @@ struct Dimensions {
 
   constexpr void new_line() {
     if (lines() > displayed_lines) {
-        displayed_lines = cursor_line += 1;
+      displayed_lines = cursor_line += 1;
     } else {
-      if (0 < surface_height / lines()) {
-        displayed_lines += 1; // half a line displayed is a line displayed.
-      }
       scrollback_lines += 1;
     }
   }

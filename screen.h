@@ -67,7 +67,7 @@ struct Screen {
 
   static Screen New(const wayland::Connection &, Font &&);
 
-  void changeScrollY(const int32_t);
+  void changeScrollY(int32_t);
   void changeScrollX(const int32_t);
   void resetScroll() { dimensions_.scroll_y = 0; }
 
@@ -116,7 +116,7 @@ private:
   std::unique_ptr<wayland::Surface> surface_;
 
   GLuint glProgram_ = 0;
-  Framebuffer framebuffer_ = Framebuffer(/* total number of framebuffers */ 5);
+  Framebuffer framebuffer_ = Framebuffer(/* total number of entries */ 10);
   std::list<Rectangle> rectangles_;
 
   Buffer buffer_;
