@@ -26,11 +26,9 @@ public:
   struct Draw {
     ~Draw();
     auto operator () (Rectangle_Y, const Color & color = {0.f, 0.f, 0.f, 0.f}) -> Rectangle;
-
   private:
     Draw(Framebuffer & framebuffer);
     Framebuffer & framebuffer_;
-
     friend class Framebuffer;
   };
 
@@ -51,9 +49,13 @@ private:
   Container container_;
   Container::iterator current_ = container_.end();
 
+  opengl::Shader glProgram_;
+
   uint16_t height_ = 0;
   uint16_t width_ = 0;
   uint8_t cap_ = 0;
+
+  friend class Screen;
 };
 
 struct Screen {
@@ -115,7 +117,7 @@ private:
 
   std::unique_ptr<wayland::Surface> surface_;
 
-  GLuint glProgram_ = 0;
+  opengl::Shader glProgram_;
   Framebuffer framebuffer_ = Framebuffer(/* total number of entries */ 10);
   std::list<Rectangle> rectangles_;
 

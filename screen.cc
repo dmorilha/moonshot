@@ -4,58 +4,10 @@
 #include "types.h"
 
 namespace {
-static const char * const vertex_shader_text =
-  "#version 120\n"
-  "attribute vec4 vPos;\n"
-  "varying vec2 texcoord;\n"
-  "void main()\n"
-  "{\n"
-  "    texcoord = vPos.zw;\n"
-  "    gl_Position = vec4(vPos.xy, 0, 1);\n"
-  "}\n";
-
-static const char * const fragment_shader_text =
-  "#version 120\n"
-  "uniform sampler2D texture;\n"
-  "uniform vec3 background;\n"
-  "uniform vec3 color;\n"
-  "varying vec2 texcoord;\n"
-  "void main()\n"
-  "{\n"
-  "    vec3 character = texture2D(texture, texcoord).rgb;\n"
-  "    gl_FragColor = vec4(mix(background, color, character), 1.0);\n"
-  "}\n";
-
-static const char * const fragment_shader_text2 =
-  "#version 120\n"
-  "uniform sampler2D texture2;\n"
-  "varying vec2 texcoord;\n"
-  "void main()\n"
-  "{\n"
-  "    gl_FragColor = texture2D(texture2, texcoord);\n"
-  "}\n";
-
 const float backgroundColor[3] = { 0.f, 0.f, 0.f, };
 const float foregroundColor[3] = { 1.f, 1.f, 1.f, };
-
-static GLuint vertex_shader = 0;
-static GLuint fragment_shader = 0;
-static GLuint fragment_shader2 = 0;
-
-struct {
-  GLint background = 0;
-  GLint color = 0;
-  GLint texture = 0;
-  GLint vpos = 0;
-  GLint texture2 = 0;
-  GLint vpos2 = 0;
-} location;
-
-GLuint glProgram2 = 0;
-
 } // end of annonymous namespace
 
-/* should it be a singleton ? */
 Screen Screen::New(const wayland::Connection & connection, Font && font) {
   auto egl = connection.egl();
   std::unique_ptr<wayland::Surface> surface = connection.surface(std::move(egl));
@@ -69,37 +21,46 @@ Screen Screen::New(const wayland::Connection & connection, Font && font) {
 
   connection.roundtrip();
 
-  vertex_shader = glCreateShader(GL_VERTEX_SHADER);
-  glShaderSource(vertex_shader, 1, &vertex_shader_text, nullptr);
-  glCompileShader(vertex_shader);
+  screen.glProgram_.vertex(
+      "#version 120\n"
+      "attribute vec4 vpos;\n"
+      "varying vec2 texcoord;\n"
+      "void main()\n"
+      "{\n"
+      "    texcoord = vpos.zw;\n"
+      "    gl_Position = vec4(vpos.xy, 0, 1);\n"
+      "}\n")
+    .fragment(
+      "#version 120\n"
+      "uniform sampler2D texture;\n"
+      "uniform vec3 background;\n"
+      "uniform vec3 color;\n"
+      "varying vec2 texcoord;\n"
+      "void main()\n"
+      "{\n"
+      "    vec3 character = texture2D(texture, texcoord).rgb;\n"
+      "    gl_FragColor = vec4(mix(background, color, character), 1.0);\n"
+      "}\n")
+    .link();
 
-  fragment_shader = glCreateShader(GL_FRAGMENT_SHADER);
-  glShaderSource(fragment_shader, 1, &fragment_shader_text, nullptr);
-  glCompileShader(fragment_shader);
-
-  fragment_shader2 = glCreateShader(GL_FRAGMENT_SHADER);
-  glShaderSource(fragment_shader2, 1, &fragment_shader_text2, nullptr);
-  glCompileShader(fragment_shader2);
-
-  screen.glProgram_ = glCreateProgram();
-
-  glAttachShader(screen.glProgram_, vertex_shader);
-  glAttachShader(screen.glProgram_, fragment_shader);
-  glLinkProgram(screen.glProgram_);
-
-  location.background = glGetUniformLocation(screen.glProgram_, "background");
-  location.color = glGetUniformLocation(screen.glProgram_, "color");
-  location.texture = glGetUniformLocation(screen.glProgram_, "texture");
-  location.vpos = glGetAttribLocation(screen.glProgram_, "vPos");
-
-  glProgram2 = glCreateProgram();
-
-  glAttachShader(glProgram2, vertex_shader);
-  glAttachShader(glProgram2, fragment_shader2);
-  glLinkProgram(glProgram2);
-
-  location.texture2 = glGetUniformLocation(glProgram2, "texture2");
-  location.vpos2 = glGetAttribLocation(glProgram2, "vPos");
+  screen.framebuffer_.glProgram_.vertex(
+      "#version 120\n"
+      "attribute vec4 vpos;\n"
+      "varying vec2 texcoord;\n"
+      "void main()\n"
+      "{\n"
+      "    texcoord = vpos.zw;\n"
+      "    gl_Position = vec4(vpos.xy, 0, 1);\n"
+      "}\n")
+    .fragment(
+      "#version 120\n"
+      "uniform sampler2D texture;\n"
+      "varying vec2 texcoord;\n"
+      "void main()\n"
+      "{\n"
+      "    gl_FragColor = texture2D(texture, texcoord);\n"
+      "}\n")
+    .link();
 
   screen.dimensions();
 
@@ -225,30 +186,25 @@ Rectangle Screen::printCharacter(Framebuffer::Draw & drawer, const Rectangle_Y &
   glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
 
   // shaders
-  assert(0 < glProgram_);
-  glUseProgram(glProgram_);
-  assert(0 <= location.texture);
-  glUniform1i(location.texture, 0);
-  assert(0 <= location.background);
-  if (rune.hasBackgroundColor) {
-    glUniform3fv(location.background, 1, rune.backgroundColor);
-  } else {
-    glUniform3fv(location.background, 1, backgroundColor);
+  {
+    auto shader = glProgram_.use();
+    shader.bind(glUniform1i, "texture", 0);
+    if (rune.hasBackgroundColor) {
+      shader.bind(glUniform3fv, "background", 1, rune.backgroundColor);
+    } else {
+      shader.bind(glUniform3fv, "background", 1, backgroundColor);
+    }
+    if (rune.hasForegroundColor) {
+      shader.bind(glUniform3fv, "color", 1, rune.foregroundColor);
+    } else {
+      shader.bind(glUniform3fv, "color", 1, foregroundColor);
+    }
+    shader.bind(glEnableVertexAttribArray, "vpos");
+    shader.bind(glVertexAttribPointer, "vpos", 4, GL_FLOAT, GL_FALSE, sizeof(vertices[0]), nullptr);
+    glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
+    glDeleteBuffers(1, &vertex_buffer);
+    glDeleteTextures(1, &texture);
   }
-  assert(0 <= location.color);
-  if (rune.hasForegroundColor) {
-    glUniform3fv(location.color, 1, rune.foregroundColor);
-  } else {
-    glUniform3fv(location.color, 1, foregroundColor);
-  }
-  assert(0 <= location.vpos);
-  glEnableVertexAttribArray(location.vpos);
-  glVertexAttribPointer(location.vpos, 4, GL_FLOAT, GL_FALSE, sizeof(vertices[0]), nullptr);
-
-  glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
-
-  glDeleteBuffers(1, &vertex_buffer);
-  glDeleteTextures(1, &texture);
 
   return target;
 }
@@ -549,17 +505,13 @@ void Framebuffer::repaint(const Rectangle rectangle, const uint64_t offset_y) {
         glBindBuffer(GL_ARRAY_BUFFER, vertex_buffer);
         glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
 
-        assert(0 < glProgram2);
-        glUseProgram(glProgram2);
-
-        assert(0 <= location.texture2);
-        glUniform1i(location.texture2, 0);
-
-        assert(0 <= location.vpos2);
-        glEnableVertexAttribArray(location.vpos2);
-        glVertexAttribPointer(location.vpos2, 4, GL_FLOAT, GL_FALSE, sizeof(vertices[0]), nullptr);
-
-        glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
+        {
+          auto shader = glProgram_.use();
+          shader.bind(glUniform1i, "texture", 0);
+          shader.bind(glEnableVertexAttribArray, "vpos");
+          shader.bind(glVertexAttribPointer, "vpos", 4, GL_FLOAT, GL_FALSE, sizeof(vertices[0]), nullptr);
+          glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
+        }
       }
       y = y2;
     }
@@ -615,17 +567,13 @@ void Framebuffer::repaint(const Rectangle rectangle, const uint64_t offset_y) {
         glBindBuffer(GL_ARRAY_BUFFER, vertex_buffer);
         glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
 
-        assert(0 < glProgram2);
-        glUseProgram(glProgram2);
-
-        assert(0 <= location.texture2);
-        glUniform1i(location.texture2, 0);
-
-        assert(0 <= location.vpos2);
-        glEnableVertexAttribArray(location.vpos2);
-        glVertexAttribPointer(location.vpos2, 4, GL_FLOAT, GL_FALSE, sizeof(vertices[0]), nullptr);
-
-        glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
+        {
+          auto shader = glProgram_.use();
+          shader.bind(glUniform1i, "texture", 0);
+          shader.bind(glEnableVertexAttribArray, "vpos");
+          shader.bind(glVertexAttribPointer, "vpos", 4, GL_FLOAT, GL_FALSE, sizeof(vertices[0]), nullptr);
+          glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
+        }
       }
       y = y2;
     }
@@ -660,17 +608,14 @@ bool Framebuffer::paintFrame(const uint16_t frame) {
   glBindBuffer(GL_ARRAY_BUFFER, vertex_buffer);
   glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
 
-  assert(0 < glProgram2);
-  glUseProgram(glProgram2);
+  {
+    auto shader = glProgram_.use();
+    shader.bind(glUniform1i, "texture", 0);
+    shader.bind(glEnableVertexAttribArray, "vpos");
+    shader.bind(glVertexAttribPointer, "vpos", 4, GL_FLOAT, GL_FALSE, sizeof(vertices[0]), nullptr);
+    glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
+  }
 
-  assert(0 <= location.texture2);
-  glUniform1i(location.texture2, 0);
-
-  assert(0 <= location.vpos2);
-  glEnableVertexAttribArray(location.vpos2);
-  glVertexAttribPointer(location.vpos2, 4, GL_FLOAT, GL_FALSE, sizeof(vertices[0]), nullptr);
-
-  glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
   return true;
 }
 
