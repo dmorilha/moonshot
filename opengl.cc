@@ -36,17 +36,17 @@ bool Shader::Location::operator == (const std::string & identifier) const {
   return identifier_ == identifier;
 }
 
-std::mutex Shader::Use::mutex_{};
+std::mutex Shader::Use::gpu_mutex_;
 
 Shader::Use::~Use() {
   glUseProgram(0);
-  mutex_.unlock();
+  gpu_mutex_.unlock();
   assert(nullptr != instance_);
 }
 
 Shader::Use::Use(const Shader * const instance) : instance_(instance) {
   assert(nullptr != instance_);
-  mutex_.lock();
+  gpu_mutex_.lock();
   glUseProgram(instance_->program_);
 }
 

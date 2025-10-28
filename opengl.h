@@ -49,7 +49,7 @@ struct Shader {
 
   private:
     const Shader * const instance_ = nullptr;
-    static std::mutex mutex_;
+    static std::mutex gpu_mutex_;
   };
 
   std::vector<Entry *> shaders_;
