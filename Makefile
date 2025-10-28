@@ -1,9 +1,13 @@
+C_FLAGS += -MMD
+
+CXX_FLAGS += -MMD
 CXX_FLAGS += -std=c++20
 
 #debug 
 CXX_FLAGS += -g
-CC_FLAGS += -g
 CXX_FLAGS += -DDEBUG
+
+CC_FLAGS += -g
 CC_FLAGS += -DDEBUG
 
 LIBS := -lwayland-client -lwayland-egl -lwayland-cursor -lxkbcommon -lEGL -lGL
@@ -31,5 +35,7 @@ $(TARGET): $(OBJECTS) $(HEADERS)
 %.o : %.cc
 	$(CXX) $(CXX_FLAGS) -c -o $@ $<;
 
+-include $(DEPENDENCIES)
+
 clean:
-	rm -v $(OBJECTS) $(TARGET);
+	rm -v $(OBJECTS) $(TARGET) $(DEPENDENCIES);
