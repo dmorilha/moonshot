@@ -111,7 +111,7 @@ void vt100::handleDecMode(const unsigned int code, const bool mode) {
 
   case 25:
     /* dectcem - hide/show cursor */
-    assert(!"UNIMPLEMENTED");
+    /* value = self->cursor.hidden; */
     break;
 
   case 40:
@@ -156,7 +156,7 @@ void vt100::handleDecMode(const unsigned int code, const bool mode) {
 
   case 1000:
     /* x11 xterm mouse protocol */
-    assert(!"UNIMPLEMENTED");
+    /* value = self->mouse.mouse_vt200; */
     break;
 
   case 1001:
