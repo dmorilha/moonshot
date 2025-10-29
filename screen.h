@@ -1,8 +1,6 @@
 #pragma once
 
-#include <iostream>
 #include <list>
-#include <vector>
 
 #include "buffer.h"
 #include "character-map.h"
