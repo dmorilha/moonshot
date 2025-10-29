@@ -135,32 +135,13 @@ Rectangle Screen::printCharacter(Framebuffer::Draw & drawer, const Rectangle_Y &
     }
   }
 
-  characters_.retrieve(rune);
-
-  freetype::Glyph glyph;
-
-  switch (rune.style) {
-  case rune::Style::REGULAR:
-    glyph = characters_.font().regular().glyph(rune.character);
-    break;
-  case rune::Style::BOLD:
-    glyph = characters_.font().bold().glyph(rune.character);
-    break;
-  case rune::Style::ITALIC:
-    glyph = characters_.font().italic().glyph(rune.character);
-    break;
-  case rune::Style::BOLD_AND_ITALIC:
-    glyph = characters_.font().boldItalic().glyph(rune.character);
-    break;
-  }
-
   const Rectangle target = drawer(rectangle, rune.backgroundColor);
+  const Character & character = characters_.retrieve(rune);
 
-  // assert(0 < dimensions_.glyph_descender);
-  const float vertex_bottom = framebuffer_.scale_height() * (target.y + glyph.top - (dimensions_.glyph_descender + glyph.height));
-  const float vertex_left = framebuffer_.scale_width() * (target.x + glyph.left);
-  const float vertex_right = framebuffer_.scale_width() * (target.x + glyph.left + glyph.width);
-  const float vertex_top = framebuffer_.scale_height() * (target.y + glyph.top - dimensions_.glyph_descender);
+  const float vertex_bottom = framebuffer_.scale_height() * (target.y + character.top - (dimensions_.glyph_descender + character.height));
+  const float vertex_left = framebuffer_.scale_width() * (target.x + character.left);
+  const float vertex_right = framebuffer_.scale_width() * (target.x + character.left + character.width);
+  const float vertex_top = framebuffer_.scale_height() * (target.y + character.top - dimensions_.glyph_descender);
 
   const float vertices[4][4] = {
     // vertex a - left top
@@ -172,19 +153,16 @@ Rectangle Screen::printCharacter(Framebuffer::Draw & drawer, const Rectangle_Y &
     // vertex d - left bottom
     { -1.f + vertex_left, -1.f + vertex_bottom, 0, 1, },}; 
 
-  // texture
-  opengl::Texture texture;
-  glBindTexture(GL_TEXTURE_2D, texture);
-  glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
-  glTexImage2D(GL_TEXTURE_2D, 0, GL_LUMINANCE, glyph.width, glyph.height, 0, GL_LUMINANCE, GL_UNSIGNED_BYTE, glyph.pixels);
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-
   // vertices
   GLuint vertex_buffer = 0;
   glGenBuffers(1, &vertex_buffer);
   glBindBuffer(GL_ARRAY_BUFFER, vertex_buffer);
   glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
+
+  // texture
+  assert(0 != character.texture);
+  glBindTexture(GL_TEXTURE_2D, character.texture);
+  glActiveTexture(GL_TEXTURE0 + character.texture);
 
   // shaders
   {
@@ -206,6 +184,7 @@ Rectangle Screen::printCharacter(Framebuffer::Draw & drawer, const Rectangle_Y &
   }
 
   glDeleteBuffers(1, &vertex_buffer);
+  glActiveTexture(GL_TEXTURE0);
 
   return target;
 }

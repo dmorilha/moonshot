@@ -226,6 +226,7 @@ Framebuffer::Read Framebuffer::read() const {
 }
 
 Texture::~Texture() {
+  std::cout << __func__ << std::endl;
   assert(0 != texture_);
   glDeleteTextures(1, &texture_);
 }

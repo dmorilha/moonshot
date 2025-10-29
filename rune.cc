@@ -21,6 +21,10 @@ std::ostream & operator << (std::ostream & o, const Rune & rune) {
 
 bool Rune::iscontrol() const { return std::iscntrl(character, locale_); }
 
+bool Rune::operator < (const Rune & o) const {
+  return character < o.character || style < o.style;
+}
+
 Rune RuneFactory::make(const wchar_t c) {
   Rune rune(c);
   if (isBold && isItalic) {

@@ -117,7 +117,9 @@ private:
 struct Texture {
   ~Texture();
   Texture();
-  constexpr operator GLuint () { return texture_; }
+  Texture(const Texture &) = delete;
+  Texture & operator = (const Shader &) = delete;
+  constexpr operator GLuint () const { return texture_; }
   GLuint texture_ = 0;
 };
 
