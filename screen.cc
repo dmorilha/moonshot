@@ -171,8 +171,7 @@ Rectangle Screen::printCharacter(Framebuffer::Draw & drawer, const Rectangle_Y &
     { -1.f + vertex_left, -1.f + vertex_bottom, 0, 1, },}; 
 
   // texture
-  GLuint texture = 0;
-  glGenTextures(1, &texture);
+  opengl::Texture texture;
   glBindTexture(GL_TEXTURE_2D, texture);
   glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
   glTexImage2D(GL_TEXTURE_2D, 0, GL_LUMINANCE, glyph.width, glyph.height, 0, GL_LUMINANCE, GL_UNSIGNED_BYTE, glyph.pixels);
@@ -202,9 +201,9 @@ Rectangle Screen::printCharacter(Framebuffer::Draw & drawer, const Rectangle_Y &
     shader.bind(glEnableVertexAttribArray, "vpos");
     shader.bind(glVertexAttribPointer, "vpos", 4, GL_FLOAT, GL_FALSE, sizeof(vertices[0]), nullptr);
     glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
-    glDeleteBuffers(1, &vertex_buffer);
-    glDeleteTextures(1, &texture);
   }
+
+  glDeleteBuffers(1, &vertex_buffer);
 
   return target;
 }

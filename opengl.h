@@ -114,6 +114,13 @@ private:
   GLuint texture_ = 0;
 };
 
+struct Texture {
+  ~Texture();
+  Texture();
+  constexpr operator GLuint () { return texture_; }
+  GLuint texture_ = 0;
+};
+
 void clear(const GLsizei, const GLsizei, const Color & color = color::black);
 
 } // end of namespace opengl

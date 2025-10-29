@@ -225,6 +225,16 @@ Framebuffer::Read Framebuffer::read() const {
   return Framebuffer::Read(framebuffer_, texture_);
 }
 
+Texture::~Texture() {
+  assert(0 != texture_);
+  glDeleteTextures(1, &texture_);
+}
+
+Texture::Texture() {
+  glGenTextures(1, &texture_);
+  assert(0 != texture_);
+}
+
 void clear(const GLsizei width, const GLsizei height, const Color & color) {
   glViewport(0, 0, width, height);
   glClearColor(color.red, color.green, color.blue, color.alpha);
