@@ -8,13 +8,13 @@ const float backgroundColor[3] = { 0.f, 0.f, 0.f, };
 const float foregroundColor[3] = { 1.f, 1.f, 1.f, };
 } // end of annonymous namespace
 
-Screen Screen::New(const wayland::Connection & connection, Font && font) {
+Screen Screen::New(const wayland::Connection & connection) {
   auto egl = connection.egl();
   std::unique_ptr<wayland::Surface> surface = connection.surface(std::move(egl));
 
   surface->setTitle("Terminal");
 
-  Screen screen(std::move(surface), std::move(font));
+  Screen screen(std::move(surface));
 
   screen.makeCurrent();
   screen.swapBuffers();
@@ -76,7 +76,7 @@ void Screen::setTitle(const std::string title) {
 
 Screen::~Screen() { }
 
-Screen::Screen(std::unique_ptr<wayland::Surface> && surface, Font && font) : surface_(std::move(surface)), font_(std::move(font)) {
+Screen::Screen(std::unique_ptr<wayland::Surface> && surface) : surface_(std::move(surface)) {
   assert(static_cast<bool>(surface_));
   surface_->onResize = std::bind_front(&Screen::resize, this);
 }
@@ -101,7 +101,7 @@ void Screen::resize(uint16_t width, uint16_t height) {
   repaintFull_ = true;
 }
 
-Screen::Screen(Screen && other) : surface_(std::move(other.surface_)), font_(std::move(other.font_)) { }
+Screen::Screen(Screen && other) : surface_(std::move(other.surface_)) { }
 
 void Screen::changeScrollY(int32_t value) {
   value *= -2;
@@ -135,20 +135,22 @@ Rectangle Screen::printCharacter(Framebuffer::Draw & drawer, const Rectangle_Y &
     }
   }
 
+  characters_.retrieve(rune);
+
   freetype::Glyph glyph;
 
   switch (rune.style) {
   case rune::Style::REGULAR:
-    glyph = font_.regular().glyph(rune.character);
+    glyph = characters_.font().regular().glyph(rune.character);
     break;
   case rune::Style::BOLD:
-    glyph = font_.bold().glyph(rune.character);
+    glyph = characters_.font().bold().glyph(rune.character);
     break;
   case rune::Style::ITALIC:
-    glyph = font_.italic().glyph(rune.character);
+    glyph = characters_.font().italic().glyph(rune.character);
     break;
   case rune::Style::BOLD_AND_ITALIC:
-    glyph = font_.boldItalic().glyph(rune.character);
+    glyph = characters_.font().boldItalic().glyph(rune.character);
     break;
   }
 
@@ -319,7 +321,7 @@ void Screen::swapBuffers() {
 }
 
 void Screen::dimensions() {
-  freetype::Face & face = font_.regular();
+  freetype::Face & face = characters_.font().regular();
   dimensions_.glyph_descender = face.descender();
   // assert(0 < dimensions_.glyph_descender);
   dimensions_.line_height = face.lineHeight();

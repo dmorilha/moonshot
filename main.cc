@@ -29,15 +29,7 @@ int main(int argc, char ** argv) {
   connection.connect();
   connection.capabilities();
 
-  auto font = Font::New({
-    .bold = "/usr/share/fonts/liberation-fonts/LiberationMono-Bold.ttf",
-    .boldItalic = "/usr/share/fonts/liberation-fonts/LiberationMono-BoldItalic.ttf",
-    .italic = "/usr/share/fonts/liberation-fonts/LiberationMono-Italic.ttf",
-    .regular = "/usr/share/fonts/liberation-fonts/LiberationMono-Regular.ttf",
-    .size = 15,
-  });
-
-  Screen screen{Screen::New(connection, std::move(font))};
+  Screen screen{Screen::New(connection)};
 
   connection.roundtrip();
 
@@ -56,10 +48,10 @@ int main(int argc, char ** argv) {
     if (0 != (modifiers & 0x4 /* crtl key */)) {
       switch (key) {
       case XKB_KEY_plus:
-        screen.increaseFontSize();
+        // screen.increaseFontSize();
         return;
       case XKB_KEY_minus:
-        screen.decreaseFontSize();
+        // screen.decreaseFontSize();
         return;
       default:
         break;

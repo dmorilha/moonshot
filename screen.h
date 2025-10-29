@@ -5,6 +5,7 @@
 #include <vector>
 
 #include "buffer.h"
+#include "character-map.h"
 #include "dimensions.h"
 #include "font.h"
 #include "freetype.h"
@@ -67,7 +68,7 @@ struct Screen {
   Screen & operator = (const Screen &) = delete;
   Screen & operator = (Screen && other) = delete;
 
-  static Screen New(const wayland::Connection &, Font &&);
+  static Screen New(const wayland::Connection &);
 
   void changeScrollY(int32_t);
   void changeScrollX(const int32_t);
@@ -78,8 +79,10 @@ struct Screen {
   int32_t getColumn() const { return dimensions_.cursor_column; }
   int32_t getLine() const { return dimensions_.cursor_line; }
 
+  #if 0
   void decreaseFontSize() { font_.decreaseSize(); dimensions(); }
   void increaseFontSize() { font_.increaseSize(); dimensions(); }
+  #endif
 
   void pushBack(rune::Rune &&);
 
@@ -109,11 +112,9 @@ private:
 
   Rectangle printCharacter(Framebuffer::Draw & drawer, const Rectangle_Y &, rune::Rune);
 
-  Screen(std::unique_ptr<wayland::Surface> &&, Font &&);
+  Screen(std::unique_ptr<wayland::Surface> &&);
 
   void dimensions();
-
-  Font font_;
 
   std::unique_ptr<wayland::Surface> surface_;
 
@@ -132,4 +133,6 @@ private:
   bool repaintFull_ = false;
 
   Dimensions dimensions_;
+
+  CharacterMap characters_;
 };
