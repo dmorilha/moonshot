@@ -85,6 +85,7 @@ struct Screen {
   void pushBack(rune::Rune &&);
 
   void clear();
+  void clearScrollback();
   void backspace();
   void repaint(const bool force = false);
   void resize(uint16_t, uint16_t);

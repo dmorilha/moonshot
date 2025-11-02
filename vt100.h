@@ -40,6 +40,7 @@ private:
   void handleOSC(const char);
   void handlePM(const char);
   void handleSGR();
+  Color handleSGRColor(const std::vector<const char *> &);
   void handleSGRCommand(const int);
 
   void reportDeviceStatus(const int32_t);

@@ -514,6 +514,7 @@ void vt100::handleSGR() {
 
   /* requires a color parser */
   if (0 == strcmp("38", codes[0]) || 0 == strcmp("48", codes[0])) {
+    const Color color = handleSGRColor(codes);
     return;
   }
 
@@ -702,10 +703,25 @@ void vt100::handleCSI(const char c) {
 
       case 'J':
         /* ED - erase display */
-        if (2 == escapeSequence_.size()) {
-          screen_->clear();
-        }
-        break;
+        {
+          const std::size_t size = escapeSequence_.size();
+          if (2 == size) {
+            screen_->clear();
+          } else if (3 == size)  {
+            int32_t argument = std::atoi(escapeSequence_.data());
+            switch (argument) {
+            case 2:
+              screen_->clear();
+              break;
+            case 3:
+              screen_->clearScrollback();
+              break;
+            default:
+              assert(!"UNIMPLEMENTED");
+              break;
+            }
+          }
+        } break;
 
       case 'd':
         /* VPA - move cursor to row Ps */
@@ -734,7 +750,7 @@ void vt100::handleCSI(const char c) {
           }
 
           if (bottom > top) {
-            screen_->setCursor(0, 0);
+            screen_->setCursor(1, 1);
           } else {
             assert(!"invalid DECSTBM sequence");
           }
@@ -782,8 +798,8 @@ void vt100::handleCSI(const char c) {
             stream >> delimiter;
             assert(';' == delimiter);
             stream >> line;
-            column = std::max<int64_t>(1, column);
-            line = std::max<int64_t>(1, line);
+            column = std::max<uint16_t>(1, column);
+            line = std::max<uint16_t>(1, line);
             assert(screen_->getLines() >= line);
             assert(screen_->getColumns() >= column);
           }
@@ -886,19 +902,19 @@ void vt100::handleOSC(const char c) {
 
     assert(1 < escapeSequence_.size());
 
-    std::cerr << "Full OSC escape sequence " << escapeSequence_.data() << std::endl;
-
     const unsigned int code = std::atoi(escapeSequence_.data());
     switch (code) {
     case 0:
-      /* change icon name and window title */
-      break;
+      /* change window title */
+      {
+        const std::string title = escapeSequence_.data() + 2;
+        screen_->setTitle(title);
+      } break;
 
     default:
       assert(!"UNIMPLEMENTED");
       break;
     }
-
 
     escapeSequence_.clear();
     state_ = LITERAL;
@@ -1140,7 +1156,7 @@ void vt100::handleCharacter(const char c) {
 void vt100::reportDeviceStatus(const int32_t argument) {
   switch (argument) {
   case 6:
-    std::cout << screen_->getColumn() << " " << screen_->getLine() << std::endl;
+    // std::cout << screen_->getColumn() << " " << screen_->getLine() << std::endl;
     // I don't know what should be done here.
     break;
   default:
@@ -1149,3 +1165,10 @@ void vt100::reportDeviceStatus(const int32_t argument) {
   }
 }
 
+Color vt100::handleSGRColor(const std::vector<const char *> & codes) {
+  for (auto component : codes) {
+    std::cout << component << ", ";
+  }
+  std::cout << std::endl;
+  return color::white;
+}

@@ -620,9 +620,12 @@ void Screen::backspace() {
   drawer(static_cast<Rectangle_Y>(dimensions_));
 }
 
-// still broken
 void Screen::clear() {
   dimensions_.clear();
   repaint_ = SCROLL;
   repaintFull_ = true;
+}
+
+void Screen::clearScrollback() {
+  std::cerr << __FILE__ << ":" << __LINE__ << " " << __func__ << " unimplemented" << std::endl;
 }
