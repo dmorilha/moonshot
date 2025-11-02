@@ -1,3 +1,6 @@
+#include <iostream>
+#include <thread>
+
 #include <GL/gl.h>
 
 #include "screen.h"
@@ -6,13 +9,31 @@
 namespace {
 const float backgroundColor[3] = { 0.f, 0.f, 0.f, };
 const float foregroundColor[3] = { 1.f, 1.f, 1.f, };
+
+std::ostream & operator << (std::ostream & o, const Screen::Repaint r) {
+  switch (r) {
+  case Screen::NO:
+    o << "NO";
+    break;
+  case Screen::DRAW:
+    o << "DRAW";
+    break;
+  case Screen::SCROLL:
+    o << "SCROLL";
+    break;
+  default:
+    assert(!"UNRECHEABLE");
+    break;
+  }
+  return o;
+}
 } // end of annonymous namespace
 
 Screen Screen::New(const wayland::Connection & connection) {
   auto egl = connection.egl();
   std::unique_ptr<wayland::Surface> surface = connection.surface(std::move(egl));
 
-  surface->setTitle("Terminal");
+  surface->setTitle("Moonshot");
 
   Screen screen(std::move(surface));
 
@@ -85,11 +106,8 @@ void Screen::resize(uint16_t width, uint16_t height) {
   assert(0 < width);
   assert(0 < height);
   dimensions();
-  dimensions_.surface_width = width;
-  dimensions_.surface_height = height;
-  opengl::clear(dimensions_.surface_width, dimensions_.surface_height, color::black);
-  surface_->egl().swapBuffers();
-
+  dimensions_.surface_width(width);
+  dimensions_.surface_height(height);
   framebuffer_.resize(width, height);
 
   /* pass the number of columns to the buffer for wrapping purposes */
@@ -97,6 +115,7 @@ void Screen::resize(uint16_t width, uint16_t height) {
     onResize(width, height);
   }
 
+  dimensions_.scroll_y(0);
   repaint_ = DRAW;
   repaintFull_ = true;
 }
@@ -106,21 +125,22 @@ Screen::Screen(Screen && other) : surface_(std::move(other.surface_)) { }
 void Screen::changeScrollY(int32_t value) {
   value *= -2;
   // prevents unsigned from overflowing
-  if ((0 < value || dimensions_.scroll_y >= -1 * value)
-    && 0 < dimensions_.scrollback_lines) {
+  if ((0 < value || dimensions_.scroll_y() >= -1 * value)
+    && 0 < dimensions_.scrollback_lines()) {
     const uint64_t difference = framebuffer_.height()
-      - dimensions_.line_to_pixel(dimensions_.displayed_lines)
-      - dimensions_.surface_height % dimensions_.line_height;
-    if (difference >= dimensions_.scroll_y) {
-      dimensions_.scroll_y = std::min(difference, value + dimensions_.scroll_y);
+      - dimensions_.line_to_pixel(dimensions_.displayed_lines())
+      - dimensions_.surface_height() % dimensions_.line_height();
+    if (difference >= dimensions_.scroll_y()) {
+      dimensions_.scroll_y(std::min(difference, value + dimensions_.scroll_y()));
       repaint_ = SCROLL;
-    }
+      repaintFull_ = true;
+   }
   }
 }
 
 void Screen::draw() {
-  assert(0 < dimensions_.surface_height);
-  assert(0 < dimensions_.surface_width);
+  assert(0 < dimensions_.surface_height());
+  assert(0 < dimensions_.surface_width());
 }
 
 Rectangle Screen::printCharacter(Framebuffer::Draw & drawer, const Rectangle_Y & rectangle, rune::Rune rune) {
@@ -138,10 +158,10 @@ Rectangle Screen::printCharacter(Framebuffer::Draw & drawer, const Rectangle_Y &
   const Rectangle target = drawer(rectangle, rune.backgroundColor);
   const Character & character = characters_.retrieve(rune);
 
-  const float vertex_bottom = framebuffer_.scale_height() * (target.y + character.top - (dimensions_.glyph_descender + character.height));
+  const float vertex_bottom = framebuffer_.scale_height() * (target.y + character.top - (dimensions_.glyph_descender() + character.height));
   const float vertex_left = framebuffer_.scale_width() * (target.x + character.left);
   const float vertex_right = framebuffer_.scale_width() * (target.x + character.left + character.width);
-  const float vertex_top = framebuffer_.scale_height() * (target.y + character.top - dimensions_.glyph_descender);
+  const float vertex_top = framebuffer_.scale_height() * (target.y + character.top - dimensions_.glyph_descender());
 
   const float vertices[4][4] = {
     // vertex a - left top
@@ -153,18 +173,15 @@ Rectangle Screen::printCharacter(Framebuffer::Draw & drawer, const Rectangle_Y &
     // vertex d - left bottom
     { -1.f + vertex_left, -1.f + vertex_bottom, 0, 1, },}; 
 
-  // vertices
   GLuint vertex_buffer = 0;
   glGenBuffers(1, &vertex_buffer);
   glBindBuffer(GL_ARRAY_BUFFER, vertex_buffer);
   glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
 
-  // texture
   assert(0 != character.texture);
   glBindTexture(GL_TEXTURE_2D, character.texture);
   glActiveTexture(GL_TEXTURE0 + character.texture);
 
-  // shaders
   {
     auto shader = glProgram_.use();
     shader.bind(glUniform1i, "texture", 0);
@@ -190,15 +207,13 @@ Rectangle Screen::printCharacter(Framebuffer::Draw & drawer, const Rectangle_Y &
 }
 
 void Screen::pushBack(rune::Rune && rune) {
-#if 0
   buffer_.pushBack(std::move(rune));
-#endif
   repaint_ = DRAW;
 
-  assert(0 < dimensions_.line_height);
-  uint16_t height = dimensions_.line_height;
-  assert(0 < dimensions_.glyph_width);
-  uint16_t width = dimensions_.glyph_width;
+  assert(0 < dimensions_.line_height());
+  uint16_t height = dimensions_.line_height();
+  assert(0 < dimensions_.glyph_width());
+  uint16_t width = dimensions_.glyph_width();
   uint8_t tab = 1;
   if (rune.iscontrol()) {
     switch (rune.character) {
@@ -207,22 +222,22 @@ void Screen::pushBack(rune::Rune && rune) {
       return;
 
     case L'\b':
-      assert(1 < dimensions_.cursor_column);
-      --dimensions_.cursor_column;
+      assert(1 < dimensions_.cursor_column());
+      dimensions_.cursor_column(dimensions_.cursor_column() - 1);
       return;
 
     case L'\t': // horizontal tab
-      tab = 8 - (dimensions_.cursor_column % 8);
+      tab = 8 - (dimensions_.cursor_column() % 8);
       width *= tab;
       rune.character = L' ';
       break;
 
     case L'\r': // carriage return
-      dimensions_.cursor_column = 1;
+      dimensions_.cursor_column(1);
       return;
 
     case L'\n': // new line
-      dimensions_.new_line();
+      repaintFull_ |= dimensions_.new_line();
       return;
 
     default:
@@ -238,56 +253,58 @@ void Screen::pushBack(rune::Rune && rune) {
     rectangles_.emplace_back(printCharacter(drawer, rectangle, rune));
   }
 
-  dimensions_.cursor_column += tab;
-#if 0
-  assert(dimensions_.columns() >= dimensions_.cursor_column);
-#endif
+  // what happens when column overflow ?
+  dimensions_.cursor_column(dimensions_.cursor_column() + tab);
 }
 
-void Screen::repaint() {
-  assert(0 < dimensions_.surface_height);
-  assert(0 < dimensions_.surface_width);
+//TODO: make sure there is no parallel execution here.
+void Screen::repaint(const bool force) {
+  assert(0 < dimensions_.surface_height());
+  assert(0 < dimensions_.surface_width());
 
-  //TODO: make sure there is no parallel execution here.
-  if (NO != repaint_) {
-    glViewport(0, 0, dimensions_.surface_width, dimensions_.surface_height);
-    if (repaintFull_) {
-      opengl::clear(dimensions_.surface_width, dimensions_.surface_height, color::black);
-    }
-
+  if (force || NO != repaint_) {
+    glViewport(0, 0, dimensions_.surface_width(), dimensions_.surface_height());
+    if (force || repaintFull_) {
+      opengl::clear(dimensions_.surface_width(), dimensions_.surface_height(), color::black);
 #if 1
-    uint64_t offset_y = 0;
-    int32_t height = static_cast<int32_t>(dimensions_.line_to_pixel(dimensions_.displayed_lines + 1));
-    if (0 < dimensions_.scrollback_lines) {
-      offset_y = dimensions_.scrollback_lines * dimensions_.line_height;
-      if (dimensions_.lines() == dimensions_.displayed_lines) {
-        offset_y -= dimensions_.surface_height % dimensions_.line_height;
-      }
-      if (0 < dimensions_.scroll_y) {
-        if (offset_y > dimensions_.scroll_y) {
-          offset_y -= dimensions_.scroll_y;
-        } else  {
-          offset_y = 0;
+      uint64_t offset_y = 0;
+      int32_t height = static_cast<int32_t>(dimensions_.line_to_pixel(dimensions_.displayed_lines() + 1));
+      if (0 < dimensions_.scrollback_lines()) {
+        offset_y = dimensions_.scrollback_lines() * dimensions_.line_height();
+        if (dimensions_.lines() == dimensions_.displayed_lines()) {
+          offset_y -= dimensions_.surface_height() % dimensions_.line_height();
         }
-        height = dimensions_.surface_height;
+        if (0 < dimensions_.scroll_y()) {
+          if (offset_y > dimensions_.scroll_y()) {
+            offset_y -= dimensions_.scroll_y();
+          } else  {
+            offset_y = 0;
+          }
+          height = dimensions_.surface_height();
+        }
       }
-    }
-    framebuffer_.repaint(Rectangle{
-        .x = 0,
-        .y = 0,
-        .width = dimensions_.surface_width,
-        .height = height,
-    }, offset_y);
+      framebuffer_.repaint(Rectangle{
+          .x = 0,
+          .y = 0,
+          .width = dimensions_.surface_width(),
+          .height = height,
+          }, offset_y);
 #else
-    framebuffer_.paintFrame(0);
+      framebuffer_.paintFrame(0);
 #endif
-    swapBuffers();
+      swapBuffers();
+    } else {
+      assert(!"REPAINT FULL = false; NOT IMPLEMENTED");
+    }
   }
   repaint_ = NO;
+#if 0
+  repaintFull_ = false;
+#endif
 }
 
 void Screen::swapBuffers() {
-  if ( ! repaintFull_ && ! rectangles_.empty()) {
+  if (! repaintFull_ && ! rectangles_.empty()) {
     std::vector<Rectangle> rectangles;
     for (auto && item : rectangles_) {
       rectangles.emplace_back(std::move(item));
@@ -301,12 +318,11 @@ void Screen::swapBuffers() {
 
 void Screen::dimensions() {
   freetype::Face & face = characters_.font().regular();
-  dimensions_.glyph_descender = face.descender();
-  // assert(0 < dimensions_.glyph_descender);
-  dimensions_.line_height = face.lineHeight();
-  assert(0 < dimensions_.line_height);
-  dimensions_.glyph_width = face.glyphWidth();
-  assert(0 < dimensions_.glyph_width);
+  dimensions_.glyph_descender(face.descender());
+  dimensions_.line_height(face.lineHeight());
+  assert(0 < dimensions_.line_height());
+  dimensions_.glyph_width(face.glyphWidth());
+  assert(0 < dimensions_.glyph_width());
 }
 
 void Screen::setCursor(uint16_t column, uint16_t line) {
@@ -604,9 +620,9 @@ void Screen::backspace() {
   drawer(static_cast<Rectangle_Y>(dimensions_));
 }
 
+// still broken
 void Screen::clear() {
-  dimensions_.scrollback_lines += dimensions_.displayed_lines - 1;
-  dimensions_.displayed_lines = 1;
-  repaint_ = DRAW;
+  dimensions_.clear();
+  repaint_ = SCROLL;
   repaintFull_ = true;
 }

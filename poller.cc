@@ -14,22 +14,24 @@ void Poller::poll() {
   while (running_) {
     if ( ! files_.empty()) {
       result = ppoll(files_.data(), files_.size(), &time_, nullptr);
-      for (std::size_t index = 0; index < files_.size(); ++index) {
-        // replace by a callback.
-        if (0 != (files_[index].revents & POLLIN)) {
-          events_[index]->pollin();
+      if (0 < result) {
+        for (std::size_t index = 0; index < files_.size(); ++index) {
+          if (0 != (files_[index].revents & POLLIN)) {
+            events_[index]->pollin();
+          }
+          if (0 != (files_[index].revents & POLLOUT)) {
+            events_[index]->pollout();
+          }
+          if (0 != (files_[index].revents & POLLERR)) {
+            events_[index]->pollerr();
+          }
+          if (0 != (files_[index].revents & POLLHUP)) {
+            events_[index]->pollhup();
+          }
         }
-
-        if (0 != (files_[index].revents & POLLOUT)) {
-          events_[index]->pollout();
-        }
-
-        if (0 != (files_[index].revents & POLLERR)) {
-          events_[index]->pollerr();
-        }
-
-        if (0 != (files_[index].revents & POLLHUP)) {
-          events_[index]->pollhup();
+      } else {
+        for (std::size_t index = 0; index < files_.size(); ++index) {
+          events_[index]->timeout();
         }
       }
     }

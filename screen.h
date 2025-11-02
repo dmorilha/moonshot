@@ -70,12 +70,12 @@ struct Screen {
 
   void changeScrollY(int32_t);
   void changeScrollX(const int32_t);
-  void resetScroll() { dimensions_.scroll_y = 0; }
+  void resetScroll() { dimensions_.scroll_y(0); }
 
   int32_t getColumns() const { return dimensions_.columns(); }
   int32_t getLines() const { return dimensions_.lines(); }
-  int32_t getColumn() const { return dimensions_.cursor_column; }
-  int32_t getLine() const { return dimensions_.cursor_line; }
+  int32_t getColumn() const { return dimensions_.cursor_column(); }
+  int32_t getLine() const { return dimensions_.cursor_line(); }
 
   #if 0
   void decreaseFontSize() { font_.decreaseSize(); dimensions(); }
@@ -86,7 +86,7 @@ struct Screen {
 
   void clear();
   void backspace();
-  void repaint();
+  void repaint(const bool force = false);
   void resize(uint16_t, uint16_t);
   void setCursor(uint16_t, uint16_t);
   void setPosition(uint16_t, uint16_t);
@@ -98,6 +98,12 @@ struct Screen {
   void endSelection();
 
   std::function<void (int32_t, int32_t)> onResize;
+
+  enum Repaint {
+    NO,
+    DRAW,
+    SCROLL,
+  };
 
 private:
   Buffer & buffer() { return buffer_; }
@@ -122,11 +128,7 @@ private:
 
   Buffer buffer_;
 
-  enum {
-    NO,
-    DRAW,
-    SCROLL,
-  } repaint_ = NO;
+  Repaint repaint_ = NO;
 
   bool repaintFull_ = false;
 

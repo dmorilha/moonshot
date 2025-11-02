@@ -1,6 +1,7 @@
 #pragma once
 
 #include <atomic>
+#include <chrono>
 #include <memory>
 #include <vector>
 
@@ -13,23 +14,27 @@ struct Events {
   virtual ~Events() { }
   Events(const short e) : events(e) { }
 
-  virtual void pollin(/*...*/) { }
-  virtual void pollout(/*...*/) { }
-  virtual void pollerr(/*...*/) { }
-  virtual void pollhup(/*...*/) { }
-  /* maybe others */
+  virtual void pollin() { }
+  virtual void pollout() { }
+  virtual void pollerr() { }
+  virtual void pollhup() { }
+  virtual void timeout() { }
 
   const short events = 0;
 };
 
 struct Poller {
-  ~Poller() { }
+  ~Poller() = default;
+  Poller(const std::chrono::nanoseconds & timeout) :
+    time_{.tv_sec = 0, .tv_nsec = timeout.count(), } { }
+
   template<class T>
   T & add(int fd, std::unique_ptr<T> && t) {
     T & result = *t;
     add(fd, std::unique_ptr<Events>(std::move(t)));
     return result;
   }
+
   void add(int fd, std::unique_ptr<Events> && events);
   void off() { running_ = false; }
   void on() { running_ = true; }
@@ -38,6 +43,6 @@ struct Poller {
 private:
   std::vector<struct pollfd> files_ = {};
   std::vector<std::unique_ptr<Events>> events_ = {};
-  struct timespec time_{.tv_sec = 60, .tv_nsec = 0,};
+  const struct timespec time_;
   std::atomic_bool running_ = false;
 };
