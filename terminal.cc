@@ -157,11 +157,14 @@ void Terminal::write(const char * const key, const size_t length) {
   assert(0 <= result);
 }
 
-void Terminal::resize(int32_t width, int32_t height) {
+void Terminal::resize(int32_t, int32_t) {
   assert(nullptr != screen_);
-  winsize_.ws_col = screen_->getColumns();
-  winsize_.ws_row = screen_->getLines();
-  assert(0 < fd_.child);
-  const int result = ioctl(fd_.child, TIOCSWINSZ, &winsize_);
-  assert(0 == result);
+  if (screen_->getColumns() != winsize_.ws_col
+    || screen_->getLines() != winsize_.ws_row) {
+    winsize_.ws_col = screen_->getColumns();
+    winsize_.ws_row = screen_->getLines();
+    assert(0 < fd_.child);
+    const int result = ioctl(fd_.child, TIOCSWINSZ, &winsize_);
+    assert(0 == result);
+  }
 }
