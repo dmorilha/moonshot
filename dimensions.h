@@ -20,9 +20,10 @@ public:
 
   auto cursor_column() const { return cursor_column_; }
   auto cursor_column(const auto v) { cursor_column_ = v; }
-  auto cursor_line() const { return cursor_column_; }
+  auto cursor_line() const { return cursor_line_; }
   auto displayed_lines() const { return displayed_lines_; }
   auto displayed_lines(const auto v) { displayed_lines_ = v; }
+  auto overflow() const { return overflow_; }
   auto glyph_descender() const { return glyph_descender_; }
   auto glyph_descender(const auto v) { glyph_descender_ = v; }
   auto glyph_width() const { return glyph_width_; }
@@ -90,8 +91,9 @@ private:
 
   uint64_t scroll_y_ = 0; // is it pixels?
 
-  uint16_t displayed_lines_ = 1; //65k it goes 1 up to a ... ~thousand
-  uint64_t scrollback_lines_ = 0; //memory is the limit really.
+  uint16_t displayed_lines_ = 1; // 65k it goes 1 up to a ... ~thousand
+  uint64_t scrollback_lines_ = 0; // memory is the limit really.
+  bool overflow_ = false; // whether the cursor reached the end of the screen.
 
   friend std::ostream & operator << (std::ostream &, const Dimensions &);
 };

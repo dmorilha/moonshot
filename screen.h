@@ -22,18 +22,18 @@ private:
   using Container = std::list<Entry>;
 
 public:
-  struct Draw {
-    ~Draw();
+  struct Drawer {
+    ~Drawer();
     auto operator () (Rectangle_Y, const Color & color = {0.f, 0.f, 0.f, 0.f}) -> Rectangle;
   private:
-    Draw(Framebuffer & framebuffer);
+    Drawer(Framebuffer & framebuffer);
     Framebuffer & framebuffer_;
     friend class Framebuffer;
   };
 
   Framebuffer(const uint8_t cap = 0) : cap_(cap) { }
 
-  auto draw() -> Draw { return Draw(*this); }; 
+  auto draw() -> Drawer { return Drawer(*this); }; 
   auto paintFrame(const uint16_t frame = 0) -> bool;
   auto repaint(const Rectangle, const uint64_t) -> void;
   auto resize(const uint16_t, const uint16_t) -> void;
@@ -58,7 +58,7 @@ private:
 };
 
 struct Screen {
-  ~Screen();
+  ~Screen() = default;
   Screen() = delete;
 
   Screen(const Screen &) = delete;
@@ -91,7 +91,7 @@ struct Screen {
   void resize(uint16_t, uint16_t);
   void setCursor(uint16_t, uint16_t);
   void setPosition(uint16_t, uint16_t);
-  void setTitle(const std::string);
+  void setTitle(const std::string &);
 
   void drag(const uint16_t, const uint16_t);
 
@@ -102,38 +102,33 @@ struct Screen {
 
   enum Repaint {
     NO,
-    DRAW,
-    SCROLL,
+    PARTIAL,
+    FULL,
   };
 
 private:
   Buffer & buffer() { return buffer_; }
   void makeCurrent() const { surface_->egl().makeCurrent(); }
-  void swapBuffers() ;
+  void swapBuffers(const bool full = true);
 
   void draw();
 
   void select(const Rectangle & rectangle);
 
-  Rectangle printCharacter(Framebuffer::Draw & drawer, const Rectangle_Y &, rune::Rune);
+  Rectangle printCharacter(Framebuffer::Drawer & drawer, const Rectangle_Y &, rune::Rune);
 
   Screen(std::unique_ptr<wayland::Surface> &&);
 
   void dimensions();
 
-  std::unique_ptr<wayland::Surface> surface_;
+  int32_t overflow();
 
+  std::unique_ptr<wayland::Surface> surface_;
   opengl::Shader glProgram_;
   Framebuffer framebuffer_ = Framebuffer(/* total number of entries */ 10);
   std::list<Rectangle> rectangles_;
-
   Buffer buffer_;
-
   Repaint repaint_ = NO;
-
-  bool repaintFull_ = false;
-
   Dimensions dimensions_;
-
   CharacterMap characters_;
 };

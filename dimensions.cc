@@ -27,13 +27,16 @@ std::ostream & operator << (std::ostream & o, const Dimensions & d) {
 void Dimensions::clear() {
   scrollback_lines_ += displayed_lines_ - 1;
   displayed_lines_ = 1;
+  overflow_ = false;
 }
 
 bool Dimensions::new_line() {
   const bool add_scrollback_line = lines() == displayed_lines_;
   if (add_scrollback_line) {
+    overflow_ = 0 < surface_height_ % line_height_;
     scrollback_lines_ += 1;
   } else {
+    assert( ! overflow_);
     displayed_lines_ = cursor_line_ += 1;
   }
   return add_scrollback_line;
