@@ -158,8 +158,8 @@ Rectangle Screen::printCharacter(Framebuffer::Drawer & drawer, const Rectangle_Y
     }
   }
 
-  Rectangle target = drawer(rectangle, rune.backgroundColor);
   const Character & character = characters_.retrieve(rune);
+  Rectangle target = drawer(rectangle, rune.backgroundColor);
 
   const float vertex_bottom = framebuffer_.scale_height() * (target.y + character.top - (dimensions_.glyph_descender() + character.height));
   const float vertex_left = framebuffer_.scale_width() * (target.x + character.left);
@@ -211,44 +211,63 @@ Rectangle Screen::printCharacter(Framebuffer::Drawer & drawer, const Rectangle_Y
 
 void Screen::pushBack(rune::Rune && rune) {
   buffer_.pushBack(std::move(rune));
-  if (NO == repaint_) {
+  if (0 < dimensions_.scroll_y()) {
+    resetScroll();
+    repaint_ = FULL;
+  } else if (NO == repaint_) {
     repaint_ = PARTIAL;
   }
-
   assert(0 < dimensions_.line_height());
   uint16_t height = dimensions_.line_height();
   assert(0 < dimensions_.glyph_width());
   uint16_t width = dimensions_.glyph_width();
   uint8_t tab = 1;
-  if (rune.iscontrol()) {
-    switch (rune.character) {
-    case L'\a':
-      // assert( ! "UNREACHABLE");
-      return;
+  switch (rune.character) {
+  case L'\a':
+    // assert( ! "UNREACHABLE");
+    return;
 
-    case L'\b':
-      assert(1 < dimensions_.cursor_column());
-      dimensions_.cursor_column(dimensions_.cursor_column() - 1);
-      return;
+  case L'\b':
+    assert(1 < dimensions_.cursor_column());
+    dimensions_.cursor_column(dimensions_.cursor_column() - 1);
+    return;
 
-    case L'\t': // horizontal tab
-      tab = 8 - (dimensions_.cursor_column() % 8);
-      width *= tab;
-      rune.character = L' ';
-      break;
+  case L'\t': // horizontal tab
+    tab = 8 - (dimensions_.cursor_column() % 8);
+    width *= tab;
+    rune.character = L' ';
+    break;
 
-    case L'\r': // carriage return
-      dimensions_.cursor_column(1);
-      return;
+  case L'\r': // carriage return
+    dimensions_.cursor_column(1);
+    return;
 
-    case L'\n': // new line
-      if (dimensions_.new_line()) {
-        repaint_ = FULL;
-      }
-      return;
+  case L'\n': // new line
+    if (dimensions_.new_line()) {
+      repaint_ = FULL;
+    }
+    return;
 
-    default:
-      break;
+  default:
+    break;
+  }
+
+  // when the cursor moves beyond the last column, wrap to the next line
+  if (dimensions_.columns() < dimensions_.cursor_column()) {
+    {
+      rune::Rune copy = rune;
+      copy.character = L'\r';
+      pushBack(std::move(copy));
+    }
+    {
+      rune::Rune copy = rune;
+      copy.character = L'\n';
+      pushBack(std::move(copy));
+    }
+    {
+      rune::Rune copy = rune;
+      copy.character = L'\r';
+      pushBack(std::move(copy));
     }
   }
 
@@ -260,7 +279,6 @@ void Screen::pushBack(rune::Rune && rune) {
     rectangles_.emplace_back(printCharacter(drawer, rectangle, rune));
   }
 
-  // what happens when cursor_column overflows ?
   dimensions_.cursor_column(dimensions_.cursor_column() + tab);
 }
 

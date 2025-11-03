@@ -63,7 +63,6 @@ int main(int argc, char ** argv) {
         break;
       }
     }
-    screen.resetScroll(); // isn't what scroll lock is for ?
     terminal.write(utf8, bytes);
   };
 

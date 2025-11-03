@@ -86,10 +86,10 @@ private:
   uint16_t cursor_column_ = 1; // 65k, it goes 1 up to a ... ~thousand
   uint16_t cursor_line_ = 1; // 65k, it goes 1 up to a ... ~thousand
 
-  uint16_t surface_height_ = 0; // is it pixels?
-  uint16_t surface_width_ = 0; // is it pixels?
+  uint16_t surface_height_ = 0; // pixels
+  uint16_t surface_width_ = 0; // pixels
 
-  uint64_t scroll_y_ = 0; // is it pixels?
+  uint64_t scroll_y_ = 0; // pixels
 
   uint16_t displayed_lines_ = 1; // 65k it goes 1 up to a ... ~thousand
   uint64_t scrollback_lines_ = 0; // memory is the limit really.
