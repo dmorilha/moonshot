@@ -53,8 +53,6 @@ struct Buffer {
     return Span(container_.end() - lines_.back(), container_.end());
   }
 
-  Span difference();
-
   void setCap(const uint32_t);
   std::size_t lines() const { return lines_.size(); }
   void clear();
@@ -65,10 +63,8 @@ private:
   using Lines = std::deque<uint16_t>;
 
   Container container_;
-  Span differences_;
   Lines lines_ = {0};
   uint32_t cap_ = 0;
-  uint64_t mark_ = 0;
 
   enum {
     INITIAL = 0,

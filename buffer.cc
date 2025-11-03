@@ -72,14 +72,6 @@ const Buffer::Span Buffer::const_reverse_iterator::operator * () const {
   return Span();
 }
 
-Buffer::Span Buffer::difference() {
-  Span result;
-  uint64_t mark = container_.size();
-  std::swap(mark, mark_);
-  result = Span(container_.begin() + mark, container_.begin() + mark_);
-  return result;
-}
-
 rune::Rune Buffer::get(const uint32_t line, const uint16_t column) {
   assert(0 < column);
   assert(0 < line);
@@ -87,7 +79,6 @@ rune::Rune Buffer::get(const uint32_t line, const uint16_t column) {
     const auto linesIterator = lines_.begin();
     const uint64_t offset = std::accumulate(linesIterator, linesIterator + line - 1, 0);
     const uint16_t size = lines_[line - 1];
-
     Container::const_iterator iterator = container_.cbegin() + offset;
     for (uint16_t i = 1, j = 1; j <= size; ++i, ++j, ++iterator) {
       assert(container_.cend() != iterator);
