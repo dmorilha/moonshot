@@ -70,6 +70,14 @@ public:
     return (line - 1) * line_height_;
   }
 
+  constexpr uint64_t pixel_to_line(const uint64_t y) const {
+    assert(0 < surface_height_);
+    assert(0 < line_height_);
+    assert(line_height_ <= surface_height_);
+    const uint64_t a = (y / surface_height_) * lines();
+    return (y - (a * line_height_)) / line_height_ + a;
+  }
+
   constexpr int32_t column_to_pixel(const uint16_t column) const {
     assert(0 < glyph_width_);
     assert(0 < column);
