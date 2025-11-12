@@ -14,7 +14,6 @@
 
 #include <unistd.h>
 
-#include "buffer.h"
 #include "screen.h"
 #include "terminal.h"
 #include "vt100.h"

@@ -5,7 +5,6 @@
 
 #include <cassert>
 
-#include "buffer.h"
 #include "screen.h"
 #include "vt100.h"
 
@@ -637,7 +636,7 @@ void vt100::handleCSI(const char c) {
 
       case 'K':
         /* EL - clear(erase) line right of cursor */
-        screen_->backspace();
+        screen_->EL();
         break;
 
       case '@':

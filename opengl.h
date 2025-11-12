@@ -103,6 +103,7 @@ struct Framebuffer {
   auto bind() const -> void;
   auto draw() const -> Draw;
   auto read() const -> Read;
+  auto operator == (const Framebuffer & o) const -> bool { return framebuffer_ == o.framebuffer_; }
 
   static auto New(const GLsizei, const GLsizei, const Color & color = color::black) -> Framebuffer;
 

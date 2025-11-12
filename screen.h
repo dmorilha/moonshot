@@ -2,7 +2,7 @@
 
 #include <list>
 
-#include "buffer.h"
+#include "history.h"
 #include "character-map.h"
 #include "dimensions.h"
 #include "font.h"
@@ -12,11 +12,12 @@
 #include "types.h"
 #include "wayland.h"
 
-struct Framebuffer {
+struct Pages {
 private:
   struct Entry {
     opengl::Framebuffer framebuffer;
     Rectangle_Y area;
+    uint64_t buffer_index = 0;
   };
 
   using Container = std::list<Entry>;
@@ -24,26 +25,32 @@ private:
 public:
   struct Drawer {
     ~Drawer();
-    auto operator () (Rectangle_Y, const Color & color = {0.f, 0.f, 0.f, 0.f}) -> Rectangle;
+    auto operator () (Rectangle_Y, const uint64_t, const Color & color = {0.f, 0.f, 0.f, 0.f}) -> Rectangle;
   private:
-    Drawer(Framebuffer & framebuffer);
-    Framebuffer & framebuffer_;
-    friend class Framebuffer;
+    Drawer(Pages & pages);
+    Pages & pages_;
+    friend class Pages;
   };
 
-  Framebuffer(const uint8_t cap = 0) : cap_(cap) { }
+  Pages(const uint8_t cap = 0) : cap_(cap) { }
 
   auto draw() -> Drawer { return Drawer(*this); }; 
-  auto paintFrame(const uint16_t frame = 0) -> bool;
+  auto emplace_front(const int32_t) -> Entry &;
+  auto first_buffer_index() const -> uint64_t { return container_.empty() ? 0 : container_.front().buffer_index; }
+  auto first_y() const -> uint64_t { return container_.empty() ? 0 : container_.front().area.y; }
+  auto is_current(Entry & entry) const -> bool { return current_->framebuffer == entry.framebuffer; }
+  auto paint(const uint16_t frame = 0) -> bool;
   auto repaint(const Rectangle, const uint64_t) -> void;
-  auto resize(const uint16_t, const uint16_t) -> void;
-  auto height() const -> uint32_t;
+  auto reset(const uint16_t, const uint16_t) -> void;
+  auto total_height() const -> uint32_t;
 
-  constexpr auto scale_height() -> float const { return 2.f / height_; }
-  constexpr auto scale_width() -> float const { return 2.f / width_; }
+  constexpr auto height() const { return height_; }
+  constexpr auto scale_height() const { return 2.f / height_; }
+  constexpr auto scale_width() const { return 2.f / width_; }
 
 private:
-  auto update(Rectangle_Y &) -> void;
+  auto entry(const Rectangle_Y &, const uint64_t) -> Entry;
+  auto update(Rectangle_Y &, const uint64_t) -> void;
 
   Container container_;
   Container::iterator current_ = container_.end();
@@ -58,6 +65,14 @@ private:
 };
 
 struct Screen {
+  enum Repaint {
+    NO,
+    PARTIAL,
+    FULL,
+  };
+
+  static Screen New(const wayland::Connection &);
+
   ~Screen() = default;
   Screen() = delete;
 
@@ -66,68 +81,46 @@ struct Screen {
   Screen & operator = (const Screen &) = delete;
   Screen & operator = (Screen && other) = delete;
 
-  static Screen New(const wayland::Connection &);
-
-  void changeScrollY(int32_t);
-  void changeScrollX(const int32_t);
-  void resetScroll() { dimensions_.scroll_y(0); }
-
-  int32_t getColumns() const { return dimensions_.columns(); }
-  int32_t getLines() const { return dimensions_.lines(); }
-  int32_t getColumn() const { return dimensions_.cursor_column(); }
-  int32_t getLine() const { return dimensions_.cursor_line(); }
-
-  #if 0
-  void decreaseFontSize() { font_.decreaseSize(); dimensions(); }
-  void increaseFontSize() { font_.increaseSize(); dimensions(); }
-  #endif
-
-  void pushBack(rune::Rune &&);
-
-  void clear();
-  void clearScrollback();
-  void backspace();
-  void repaint(const bool force = false);
-  void resize(uint16_t, uint16_t);
-  void setCursor(uint16_t, uint16_t);
-  void setPosition(uint16_t, uint16_t);
-  void setTitle(const std::string &);
-
-  void drag(const uint16_t, const uint16_t);
-
-  void startSelection(uint16_t, uint16_t);
-  void endSelection();
+  auto backspace() -> void;
+  auto changeScrollY(int32_t) -> void;
+  auto clear() -> void;
+  auto clearScrollback() -> void;
+  auto drag(const uint16_t, const uint16_t) -> void;
+  auto EL() -> void;
+  auto endSelection() -> void;
+  auto getColumn() const -> int32_t { return dimensions_.cursor_column(); }
+  auto getColumns() const -> int32_t { return dimensions_.columns(); }
+  auto getLine() const -> int32_t { return dimensions_.cursor_line(); }
+  auto getLines() const -> int32_t { return dimensions_.lines(); }
+  auto pushBack(rune::Rune &&) -> void;
+  auto recreateFromBuffer(const uint64_t index) -> void;
+  auto repaint(const bool force = false) -> void;
+  auto resetScroll() -> void { dimensions_.scroll_y(0); }
+  auto resize(const uint16_t, const uint16_t) -> void;
+  auto setCursor(const uint16_t, const uint16_t) -> void;
+  auto setPosition(const uint16_t, const uint16_t) -> void;
+  auto setTitle(const std::string &) -> void;
+  auto startSelection(const uint16_t, const uint16_t) -> void;
 
   std::function<void (int32_t, int32_t)> onResize;
 
-  enum Repaint {
-    NO,
-    PARTIAL,
-    FULL,
-  };
-
 private:
-  Buffer & buffer() { return buffer_; }
-  void makeCurrent() const { surface_->egl().makeCurrent(); }
-  void swapBuffers(const bool full = true);
-
-  void draw();
-
-  void select(const Rectangle & rectangle);
-
-  Rectangle printCharacter(Framebuffer::Drawer & drawer, const Rectangle_Y &, rune::Rune);
-
   Screen(std::unique_ptr<wayland::Surface> &&);
 
-  void dimensions();
-
-  int32_t overflow();
+  auto history() -> History & { return history_; }
+  auto countLines(History::ReverseIterator &, const History::ReverseIterator &, const uint64_t limit = 0) const -> uint64_t;
+  auto draw() -> void;
+  auto makeCurrent() const -> void { surface_->egl().makeCurrent(); }
+  auto overflow() -> int32_t;
+  auto renderCharacter(const Rectangle &, const rune::Rune &) -> void;
+  auto select(const Rectangle & rectangle) -> void;
+  auto swapBuffers(const bool full = true) -> void;
 
   std::unique_ptr<wayland::Surface> surface_;
   opengl::Shader glProgram_;
-  Framebuffer framebuffer_ = Framebuffer(/* total number of entries */ 10);
+  Pages pages_{/* total number of entries */ 3};
   std::list<Rectangle> rectangles_;
-  Buffer buffer_;
+  History history_;
   Repaint repaint_ = NO;
   Dimensions dimensions_;
   CharacterMap characters_;

@@ -1,5 +1,8 @@
+#include <algorithm>
 #include <iostream>
 #include <thread>
+
+#include <cassert>
 
 #include <GL/gl.h>
 
@@ -7,8 +10,8 @@
 #include "types.h"
 
 namespace {
-const float backgroundColor[3] = { 0.f, 0.f, 0.f, };
-const float foregroundColor[3] = { 1.f, 1.f, 1.f, };
+const float backgroundColor[4] = { 0.f, 0.f, 0.f, 1.f, };
+const float foregroundColor[4] = { 1.f, 1.f, 1.f, 1.f, };
 
 std::ostream & operator << (std::ostream & o, const Screen::Repaint r) {
   switch (r) {
@@ -64,7 +67,7 @@ Screen Screen::New(const wayland::Connection & connection) {
       "}\n")
     .link();
 
-  screen.framebuffer_.glProgram_.vertex(
+  screen.pages_.glProgram_.vertex(
       "#version 120\n"
       "attribute vec4 vpos;\n"
       "varying vec2 texcoord;\n"
@@ -83,8 +86,6 @@ Screen Screen::New(const wayland::Connection & connection) {
       "}\n")
     .link();
 
-  screen.dimensions();
-
   return screen;
 }
 
@@ -102,26 +103,34 @@ Screen::Screen(std::unique_ptr<wayland::Surface> && surface) : surface_(std::mov
   surface_->onResize = std::bind_front(&Screen::resize, this);
 }
 
-void Screen::resize(uint16_t width, uint16_t height) {
+void Screen::resize(const uint16_t width, const uint16_t height) {
   assert(0 < width);
   assert(0 < height);
-  dimensions();
-  dimensions_.surface_width(width);
-  dimensions_.surface_height(height);
-  framebuffer_.resize(width, height);
+
+  /**
+   * Pages::reset currently breaks if height
+   * is anything different than surface_height
+   */
+  pages_.reset(width, height);
 
   {
+    freetype::Face & face = characters_.font().regular();
+    dimensions_.reset(face, width, height);
+  }
+
+  const uint64_t bufferSize = history_.size();
+  if (0 < bufferSize) {
+    resetScroll();
+    recreateFromBuffer(bufferSize - 1);
+    repaint_ = FULL;
+  } else {
     opengl::clear(dimensions_.surface_width(), dimensions_.surface_height(), color::black);
     swapBuffers();
   }
 
-  /* pass the number of columns to the buffer for wrapping purposes */
   if (static_cast<bool>(onResize)) {
     onResize(width, height);
   }
-
-  resetScroll();
-  repaint_ = FULL;
 }
 
 Screen::Screen(Screen && other) : surface_(std::move(other.surface_)) { }
@@ -130,10 +139,10 @@ void Screen::changeScrollY(int32_t value) {
   value *= -2;
   // prevents unsigned from overflowing
   if ((0 < value || dimensions_.scroll_y() >= -1 * value)
-    && 0 < dimensions_.scrollback_lines()) {
-    const uint64_t difference = framebuffer_.height()
+    && dimensions_.lines() < history_.lines()) {
+    const uint64_t difference = pages_.total_height()
       - dimensions_.line_to_pixel(dimensions_.displayed_lines())
-      - dimensions_.surface_height() % dimensions_.line_height();
+      - dimensions_.remainder();
     if (difference >= dimensions_.scroll_y()) {
       dimensions_.scroll_y(std::min(difference, value + dimensions_.scroll_y()));
       repaint_ = FULL;
@@ -141,30 +150,13 @@ void Screen::changeScrollY(int32_t value) {
   }
 }
 
-void Screen::draw() {
-  assert(0 < dimensions_.surface_height());
-  assert(0 < dimensions_.surface_width());
-}
-
-Rectangle Screen::printCharacter(Framebuffer::Drawer & drawer, const Rectangle_Y & rectangle, rune::Rune rune) {
-  if (rune.iscontrol()) {
-    switch (rune.character) {
-    case L'\t':
-      rune.character = L' ';
-      break;
-    default:
-      assert(!"UNIMPLEMENTED");
-      break;
-    }
-  }
-
+void Screen::renderCharacter(const Rectangle & target, const rune::Rune & rune) {
   const Character & character = characters_.retrieve(rune);
-  Rectangle target = drawer(rectangle, rune.backgroundColor);
 
-  const float vertex_bottom = framebuffer_.scale_height() * (target.y + character.top - (dimensions_.glyph_descender() + character.height));
-  const float vertex_left = framebuffer_.scale_width() * (target.x + character.left);
-  const float vertex_right = framebuffer_.scale_width() * (target.x + character.left + character.width);
-  const float vertex_top = framebuffer_.scale_height() * (target.y + character.top - dimensions_.glyph_descender());
+  const float vertex_bottom = pages_.scale_height() * (target.y + character.top - (dimensions_.glyph_descender() + character.height));
+  const float vertex_left = pages_.scale_width() * (target.x + character.left);
+  const float vertex_right = pages_.scale_width() * (target.x + character.left + character.width);
+  const float vertex_top = pages_.scale_height() * (target.y + character.top - dimensions_.glyph_descender());
 
   const float vertices[4][4] = {
     // vertex a - left top
@@ -205,41 +197,48 @@ Rectangle Screen::printCharacter(Framebuffer::Drawer & drawer, const Rectangle_Y
 
   glDeleteBuffers(1, &vertex_buffer);
   glActiveTexture(GL_TEXTURE0);
-  target.y = overflow();
-  return target;
 }
 
 void Screen::pushBack(rune::Rune && rune) {
-  buffer_.pushBack(std::move(rune));
-  if (0 < dimensions_.scroll_y()) {
+  if (dimensions_.wrap_next()) {
+    if (dimensions_.new_line()) {
+      repaint_ = FULL;
+    }
+    dimensions_.cursor_column(1);
+  }
+
+  if (FULL != repaint_ &&
+      0 < dimensions_.scroll_y()) {
     resetScroll();
     repaint_ = FULL;
   } else if (NO == repaint_) {
     repaint_ = PARTIAL;
   }
-  assert(0 < dimensions_.line_height());
-  uint16_t height = dimensions_.line_height();
+
+  uint64_t buffer_index = history_.pushBack(std::move(rune), dimensions_.carriage_return());
+
   assert(0 < dimensions_.glyph_width());
+  uint16_t columns = 1;
   uint16_t width = dimensions_.glyph_width();
-  uint8_t tab = 1;
   switch (rune.character) {
   case L'\a':
     // assert( ! "UNREACHABLE");
     return;
 
-  case L'\b':
+  case L'\b': // backspace
     assert(1 < dimensions_.cursor_column());
     dimensions_.cursor_column(dimensions_.cursor_column() - 1);
+    buffer_index = history_.erase(1);
     return;
 
   case L'\t': // horizontal tab
-    tab = 8 - (dimensions_.cursor_column() % 8);
-    width *= tab;
+    columns = 8 - (dimensions_.cursor_column() % 8);
+    width *= columns;
     rune.character = L' ';
     break;
 
   case L'\r': // carriage return
-    dimensions_.cursor_column(1);
+    dimensions_.set_carriage_return();
     return;
 
   case L'\n': // new line
@@ -252,34 +251,18 @@ void Screen::pushBack(rune::Rune && rune) {
     break;
   }
 
-  // when the cursor moves beyond the last column, wrap to the next line
-  if (dimensions_.columns() < dimensions_.cursor_column()) {
-    {
-      rune::Rune copy = rune;
-      copy.character = L'\r';
-      pushBack(std::move(copy));
-    }
-    {
-      rune::Rune copy = rune;
-      copy.character = L'\n';
-      pushBack(std::move(copy));
-    }
-    {
-      rune::Rune copy = rune;
-      copy.character = L'\r';
-      pushBack(std::move(copy));
-    }
-  }
-
   Rectangle_Y rectangle = dimensions_;
   rectangle.width = width;
 
   {
-    Framebuffer::Drawer drawer = framebuffer_.draw();
-    rectangles_.emplace_back(printCharacter(drawer, rectangle, rune));
+    Pages::Drawer drawer = pages_.draw();
+    Rectangle target = drawer(rectangle, buffer_index, rune.backgroundColor);
+    renderCharacter(target, rune);
+    target.y = overflow();
+    rectangles_.emplace_back(std::move(target));
   }
 
-  dimensions_.cursor_column(dimensions_.cursor_column() + tab);
+  dimensions_.cursor_column(dimensions_.cursor_column() + columns);
 }
 
 //TODO: make sure there is no parallel execution here.
@@ -290,30 +273,40 @@ void Screen::repaint(const bool force) {
   if (force || NO != repaint_) {
     opengl::clear(dimensions_.surface_width(), dimensions_.surface_height(), color::black);
 #if 1
-    uint64_t offset_y = 0;
     int32_t height = static_cast<int32_t>(dimensions_.line_to_pixel(dimensions_.displayed_lines() + 1));
+    uint64_t offset_y = 0;
     if (0 < dimensions_.scrollback_lines()) {
       offset_y = dimensions_.scrollback_lines() * dimensions_.line_height();
-      if (dimensions_.overflow()) {
-        offset_y -= dimensions_.surface_height() % dimensions_.line_height();
-      }
+
       if (0 < dimensions_.scroll_y()) {
         if (offset_y > dimensions_.scroll_y()) {
           offset_y -= dimensions_.scroll_y();
         } else  {
           offset_y = 0;
         }
+
         height = dimensions_.surface_height();
+
+        if (0 < pages_.first_y() &&
+            pages_.first_y() + 2 * dimensions_.surface_height() > offset_y) {
+            const uint64_t index = pages_.first_buffer_index();
+            if (1 < index) {
+              recreateFromBuffer(index - 1);
+            }
+        }
+      } else if (dimensions_.overflow()) {
+        offset_y -= dimensions_.remainder();
       }
+
     }
-    framebuffer_.repaint(Rectangle{
+    pages_.repaint(Rectangle{
         .x = 0,
         .y = 0,
         .width = dimensions_.surface_width(),
         .height = height,
         }, offset_y);
 #else
-    framebuffer_.paintFrame(0);
+    pages_.paint(0);
 #endif
     const bool forceSwapBuffers = force || rectangles_.empty() || FULL == repaint_;
     swapBuffers(forceSwapBuffers);
@@ -335,20 +328,11 @@ void Screen::swapBuffers(const bool full) {
   rectangles_.clear();
 }
 
-void Screen::dimensions() {
-  freetype::Face & face = characters_.font().regular();
-  dimensions_.glyph_descender(face.descender());
-  dimensions_.line_height(face.lineHeight());
-  assert(0 < dimensions_.line_height());
-  dimensions_.glyph_width(face.glyphWidth());
-  assert(0 < dimensions_.glyph_width());
-}
-
-void Screen::setCursor(uint16_t column, uint16_t line) {
+void Screen::setCursor(const uint16_t column, const uint16_t line) {
   dimensions_.set_cursor(column, line);
 }
 
-void Screen::startSelection(uint16_t x, uint16_t y) {
+void Screen::startSelection(const uint16_t x, const uint16_t y) {
 }
 
 void Screen::endSelection() {
@@ -360,18 +344,18 @@ void Screen::drag(const uint16_t x, const uint16_t y) {
 void Screen::select(const Rectangle & rectangle) {
 }
 
-Framebuffer::Drawer::~Drawer() {
+Pages::Drawer::~Drawer() {
   glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
   glBindTexture(GL_TEXTURE_2D, 0);
 }
 
-Framebuffer::Drawer::Drawer(Framebuffer & framebuffer) : framebuffer_(framebuffer) {
-  if (framebuffer_.container_.end() != framebuffer_.current_) {
-    framebuffer_.current_->framebuffer.bind();
+Pages::Drawer::Drawer(Pages & pages) : pages_(pages) {
+  if (pages_.container_.end() != pages_.current_) {
+    pages_.current_->framebuffer.bind();
   }
 }
 
-uint32_t Framebuffer::height() const {
+uint32_t Pages::total_height() const {
   uint32_t result = 0;
   for (const auto & item : container_) {
     result += item.area.height;
@@ -379,31 +363,31 @@ uint32_t Framebuffer::height() const {
   return result;
 }
 
-Rectangle Framebuffer::Drawer::operator () (Rectangle_Y rectangle, const Color & color) {
-  assert(framebuffer_.height_ >= rectangle.height);
-  assert(framebuffer_.width_ >= rectangle.width);
-  framebuffer_.update(rectangle);
+Rectangle Pages::Drawer::operator () (Rectangle_Y rectangle, const uint64_t buffer_index, const Color & color) {
+  assert(pages_.height_ >= rectangle.height);
+  assert(pages_.width_ >= rectangle.width);
+  pages_.update(rectangle, buffer_index);
   glEnable(GL_SCISSOR_TEST);
-  glScissor(rectangle.x, rectangle.y, rectangle.width, rectangle.height);
-  glClearColor(color.red, color.green, color.blue, color.alpha);
+  rectangle(glScissor);
+  color(glClearColor);
   glClear(GL_COLOR_BUFFER_BIT);
   glDisable(GL_SCISSOR_TEST);
   return static_cast<Rectangle>(rectangle);
 }
 
-void Framebuffer::resize(const uint16_t width, const uint16_t height) {
+void Pages::reset(const uint16_t width, const uint16_t height) {
   width_ = width;
   height_ = height;
   container_.clear();
   current_ = container_.end();
 }
 
-void Framebuffer::update(Rectangle_Y & rectangle) {
+void Pages::update(Rectangle_Y & rectangle, const uint64_t buffer_index) {
   bool found = false;
 
   // cache hit, skip a look-up
   if (container_.end() != current_ && current_->area.y <= rectangle.y && current_->area.y + height_ >= rectangle.y + rectangle.height) {
-    // grow current framebuffer area height.
+    // grow current page area height.
     const uint64_t new_height = rectangle.y + rectangle.height - current_->area.y;
     if (current_->area.height < new_height) {
       current_->area.height = new_height;
@@ -430,35 +414,27 @@ void Framebuffer::update(Rectangle_Y & rectangle) {
     }
   }
 
-  // if it did not find a framebuffer, insert a new one.
   if ( ! found) { 
-    // append fresh framebuffer
-    if (0 < cap_ && container_.size() == cap_) {
-      container_.pop_front();
+    // cap it to the last cap_ pages.
+    if (0 < cap_ && container_.size() >= cap_) {
+      const auto begin = container_.begin();
+      auto end = begin;
+      for (int i = 0; i <= container_.size() - cap_; ++i) {
+        assert(container_.end() != end);
+        ++end;
+      }
+      container_.erase(begin, end);
     }
-#if DEBUG
-    const Color color{
-      .red = static_cast<float>(drand48()),
-      .green = static_cast<float>(drand48()),
-      .blue = static_cast<float>(drand48()),
-      .alpha = 1.f};
-#else
-    const Color color = color::black;
-#endif
-    current_ = container_.emplace(container_.end(), Entry{
-      .framebuffer = opengl::Framebuffer::New(width_, height_, color),
-      .area{
-        .x = 0,
-        .y = rectangle.y,
-        .width = width_, /* broken */
-        .height = rectangle.height,
-        }});
+
+    // if it did not find a page, insert a new page at the end.
+    current_ = container_.emplace(container_.end(), entry(rectangle, buffer_index));
+
     current_->framebuffer.bind();
   }
   rectangle.y = height_ - (rectangle.y - current_->area.y) - rectangle.height;
 }
 
-void Framebuffer::repaint(const Rectangle rectangle, const uint64_t offset_y) {
+void Pages::repaint(const Rectangle rectangle, const uint64_t offset_y) {
   assert(0 == rectangle.x);
   assert(width_ >= rectangle.width);
   const auto END = container_.end();
@@ -595,7 +571,7 @@ void Framebuffer::repaint(const Rectangle rectangle, const uint64_t offset_y) {
   }
 }
 
-bool Framebuffer::paintFrame(const uint16_t frame) {
+bool Pages::paint(const uint16_t frame) {
   if (container_.size() <= frame) {
     return false;
   }
@@ -635,10 +611,21 @@ bool Framebuffer::paintFrame(const uint16_t frame) {
 }
 
 void Screen::backspace() {
-  auto drawer = framebuffer_.draw();
-  Rectangle target = drawer(static_cast<Rectangle_Y>(dimensions_));
+  auto drawer = pages_.draw();
+  Rectangle target = drawer(static_cast<Rectangle_Y>(dimensions_), 0);
   target.y = overflow();
   rectangles_.emplace_back(target);
+  repaint_ = PARTIAL;
+}
+
+void Screen::EL() {
+  Rectangle_Y rectangle(dimensions_);
+  rectangle.width = dimensions_.surface_width() - rectangle.x;
+  auto drawer = pages_.draw();
+  Rectangle target = drawer(rectangle, 0);
+  target.y = overflow();
+  rectangles_.emplace_back(target);
+  repaint_ = PARTIAL;
 }
 
 void Screen::clear() {
@@ -656,4 +643,177 @@ int32_t Screen::overflow() {
     result = dimensions_.surface_height() - dimensions_.line_to_pixel(dimensions_.cursor_line() + 1);
   }
   return result;
+}
+
+uint64_t Screen::countLines(History::ReverseIterator & iterator, const History::ReverseIterator & end, const uint64_t limit) const {
+  uint64_t lines = 0; // lines returns zero, only when iterator equals end from the start
+  History::ReverseIterator lineBegin = std::find(iterator, end, L'\n');
+  while (end != iterator && (0 == limit || limit >= lines)) {
+    ++lines;
+    uint32_t cursor_column = 1;
+    for (History::ReverseIterator line_iterator = lineBegin - 1;
+        iterator <= line_iterator; --line_iterator) {
+      uint32_t columns = 1;
+      if (line_iterator->iscontrol()) {
+        switch (line_iterator->character) {
+        case L'\n': // new line
+          continue;
+        case L'\t': // horizontal tab
+          columns = 8 - (cursor_column % 8);
+          break;
+        default:
+          std::cerr << static_cast<int>(line_iterator->character) << std::endl;
+          assert(!"UNIMPLEMENTED");
+          break;
+        }
+      }
+      const bool wrap = dimensions_.columns() < cursor_column;
+      if (wrap) {
+        cursor_column = 1;
+        ++lines;
+        if (0 < limit && limit < lines) {
+          iterator = line_iterator;
+          return limit;
+        }
+      }
+      cursor_column += columns;
+    }
+    if (limit < lines) {
+      return limit;
+    }
+    iterator = lineBegin;
+    if (end != lineBegin) {
+      ++lineBegin;
+      lineBegin = std::find(lineBegin, end, L'\n');
+    }
+  }
+  return lines;
+}
+
+void Screen::recreateFromBuffer(const uint64_t index) {
+  if (0 == index) {
+    std::cerr << __FILE__ << ":" << __LINE__ << " " << __func__ << " index is less than or equal to 0." << std::endl;
+    return;
+  }
+  assert(0 < index);
+  History::ReverseIterator end = history_.reverseIterator(index);
+  if (L'\n' == *end) {
+    ++end;
+  } else {
+    assert(L'\0' != *end);
+  }
+  History::ReverseIterator iterator = end;
+  iterator = std::find(end, history_.rend(), '\n');
+  const uint64_t lines = countLines(iterator, history_.rend(), dimensions_.lines());
+  if (L'\n' == *iterator || L'\0' == *iterator) {
+    --iterator;
+  }
+  const int32_t page_size = lines * dimensions_.line_height();
+  assert(dimensions_.surface_height() >= page_size);
+  Pages::Entry & page = pages_.emplace_front(page_size);
+  page.buffer_index = std::distance(iterator, history_.rend());
+  page.framebuffer.bind();
+  Rectangle target{
+    .x = 0,
+    .y = dimensions_.surface_height() - dimensions_.line_height(),
+    .width = dimensions_.glyph_width(),
+    .height = dimensions_.line_height(),
+  };
+  int16_t cursor_column = 1;
+  for (uint32_t columns = 1; end <= iterator; --iterator) {
+    target.width = dimensions_.glyph_width();
+    rune::Rune rune = *iterator;
+    if (rune.iscontrol()) {
+      switch (rune.character) {
+      case L'\n': // new line
+        cursor_column = 1;
+        target.y -= dimensions_.line_height();
+        target.x = 0;
+        continue;
+      case L'\t': // horizontal tab
+        columns = 8 - (cursor_column % 8);
+        target.width *= columns;
+        rune.character = L' ';
+        break;
+      default:
+        std::cerr << static_cast<int>(rune.character) << std::endl;
+        assert(!"UNIMPLEMENTED");
+        break;
+      }
+    }
+    const bool wrap = dimensions_.columns() < cursor_column;
+    if (wrap) {
+      cursor_column = 1;
+      target.y -= dimensions_.line_height();
+      target.x = 0;
+    }
+#if 1
+    glEnable(GL_SCISSOR_TEST);
+    target(glScissor);
+    rune.backgroundColor(glClearColor);
+    glClear(GL_COLOR_BUFFER_BIT);
+    glDisable(GL_SCISSOR_TEST);
+#endif
+    renderCharacter(target, rune);
+    target.x += target.width;
+    cursor_column += columns;
+  }
+  if (pages_.is_current(page)) {
+    // still not sure why cursor_line would go beyond the limits here
+    dimensions_.displayed_lines(lines);
+    setCursor(cursor_column, lines);
+  }
+  glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
+  glBindTexture(GL_TEXTURE_2D, 0);
+}
+
+Pages::Entry & Pages::emplace_front(const int32_t height) {
+  assert(0 < height);
+  assert(0 < height_);
+  assert(height <= height_);
+  uint64_t y = 0;
+  if (!container_.empty()) {
+    const Entry & front = container_.front();
+    y = Pages::first_y() - height;
+    assert(0 <= y);
+  }
+
+  const Rectangle_Y rectangle{
+    .x = 0,
+    .y = y,
+    .width = width_,
+    .height = height,
+  };
+
+  Pages::Entry & page = container_.emplace_front(entry(rectangle, 0));
+
+  if (1 == container_.size()) {
+    current_ = container_.begin();
+  }
+
+  return page;
+}
+
+Pages::Entry Pages::entry(const Rectangle_Y & rectangle, const uint64_t buffer_index) {
+  assert(0 < width_);
+  assert(0 < height_);
+#if 0
+  const Color color{
+    .red = static_cast<float>(drand48()),
+    .green = static_cast<float>(drand48()),
+    .blue = static_cast<float>(drand48()),
+    .alpha = 1.f, };
+#else
+  const Color color = color::black;
+#endif
+  return Entry{
+    .framebuffer = opengl::Framebuffer::New(width_, height_, color),
+    .area{
+      .x = 0,
+      .y = rectangle.y,
+      .width = width_, /* currently unused */
+      .height = rectangle.height,
+    },
+    .buffer_index = buffer_index,
+    };
 }

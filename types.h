@@ -11,7 +11,11 @@ struct Color {
   float green = 0.f;
   float blue = 0.f;
   float alpha = 1.f;
+
   operator const float * () const { return reinterpret_cast< const float * >(this); }
+
+  template <typename F>
+  auto operator () (F && f) const { return f(red, green, blue, alpha); }
 };
 
 namespace color {
@@ -31,7 +35,12 @@ struct Rectangle {
   int32_t y = 0;
   int32_t width = 0;
   int32_t height = 0;;
+
   operator const int * () const { return reinterpret_cast< const int * >(this); }
+
+  template <typename F>
+  auto operator () (F && f) const { return f(x, y, width, height); }
+
   friend std::ostream & operator << (std::ostream &, const Rectangle &);
 };
 
@@ -40,15 +49,16 @@ struct Rectangle_Y {
   uint64_t y = 0;
   int32_t width = 0;
   int32_t height = 0;;
-  operator Rectangle () const {
+
+  operator Rectangle () const; 
+
+  template <typename F>
+  auto operator () (F && f) const {
     if (std::numeric_limits<int32_t>::max() < y) {
       std::cerr << "narrowing " << y << " to an int32_t" << std::endl;
     }
-    return Rectangle{
-      .x = x,
-      .y = static_cast<int32_t>(y),
-      .width = width,
-      .height = height,
-    };
+    return f(x, static_cast<int32_t>(y), width, height);
   }
+
+  friend std::ostream & operator << (std::ostream &, const Rectangle &);
 };

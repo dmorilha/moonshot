@@ -31,10 +31,12 @@ void Dimensions::clear() {
 }
 
 bool Dimensions::new_line() {
-  const bool add_scrollback_line = lines() == displayed_lines_;
+  carriage_return_ = 0;
+  const bool add_scrollback_line = lines() <= displayed_lines_;
   if (add_scrollback_line) {
-    overflow_ = 0 < surface_height_ % line_height_;
+    overflow_ = 0 < remainder();
     scrollback_lines_ += 1;
+    displayed_lines_ = cursor_line_ = lines();
   } else {
     assert( ! overflow_);
     displayed_lines_ = cursor_line_ += 1;
@@ -42,11 +44,16 @@ bool Dimensions::new_line() {
   return add_scrollback_line;
 }
 
+void Dimensions::displayed_lines(const uint16_t v) {
+  assert(lines() >= displayed_lines_);
+  displayed_lines_ = v;
+}
+
 void Dimensions::set_cursor(const uint16_t column, const uint16_t line) {
   assert(0 < column);
-  assert(columns() > column);
+  assert(columns() >= column);
   assert(0 < line);
-  assert(lines() > line);
+  assert(lines() >= line);
   cursor_column_ = column;
   cursor_line_ = line;
 }
@@ -63,4 +70,40 @@ Dimensions::operator Rectangle_Y () {
     .width = glyph_width_,
     .height = line_height_,
   };
+}
+
+void Dimensions::cursor_column(const uint16_t v) {
+  assert(0 < v);
+  wrap_next_ = columns() < v;
+  cursor_column_ = v;
+}
+
+void Dimensions::reset(freetype::Face & face, const uint16_t width, const uint16_t height) {
+  assert(0 < width);
+  assert(0 < height);
+  surface_width_ = width;
+  surface_height_ = height;
+
+  glyph_descender_ = face.descender();
+
+  assert(0 < face.lineHeight());
+  line_height_ = face.lineHeight();
+
+  assert(0 < face.glyphWidth());
+  glyph_width_ = face.glyphWidth();
+
+  cursor_column_ = cursor_line_ = displayed_lines_ = 1;
+  overflow_ = wrap_next_ = false;
+  scroll_y_ = scrollback_lines_ = 0;
+}
+
+void Dimensions::set_carriage_return() {
+  if (carriage_return_ < cursor_column_) {
+    carriage_return_ = cursor_column_;
+  }
+  cursor_column_ = 1;
+}
+
+uint16_t Dimensions::carriage_return() {
+  return carriage_return_ > cursor_column_ ? carriage_return_ - cursor_column_ : 0;
 }
