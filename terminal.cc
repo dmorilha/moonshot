@@ -119,9 +119,12 @@ std::unique_ptr<Terminal> Terminal::New(Screen * const screen) {
       "xterm-256color" == terminalType ||
       "tmux-256color" == terminalType) {
     instance = std::unique_ptr<Terminal>(new vt100(screen));
-  } else {
+  } else if (terminalType.empty()) {
     unsetenv("TERM");
     instance = std::unique_ptr<Terminal>(new Terminal(screen));
+  } else {
+    setenv("TERM", "xterm-256color", 1);
+    instance = std::unique_ptr<Terminal>(new vt100(screen));
   }
 
   instance->winsize_.ws_col = screen->getColumns();

@@ -9,22 +9,22 @@ struct vt100 : public Terminal {
   vt100(Screen * const);
 
   const std::map<int, Color> Colors {
-    {30, color::black},
-    {31, color::red},
-    {32, color::green},
-    {33, color::yellow},
-    {34, color::blue},
-    {35, color::magenta},
-    {36, color::cyan},
-    {37, color::white},
-    {40, color::black},
-    {41, color::red},
-    {42, color::green},
-    {43, color::yellow},
-    {44, color::blue},
-    {45, color::magenta},
-    {46, color::cyan},
-    {47, color::white},
+    {30, colors::black},
+    {31, colors::red},
+    {32, colors::green},
+    {33, colors::yellow},
+    {34, colors::blue},
+    {35, colors::magenta},
+    {36, colors::cyan},
+    {37, colors::white},
+    {40, colors::black},
+    {41, colors::red},
+    {42, colors::green},
+    {43, colors::yellow},
+    {44, colors::blue},
+    {45, colors::magenta},
+    {46, colors::cyan},
+    {47, colors::white},
   };
 
 private:

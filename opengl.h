@@ -105,7 +105,7 @@ struct Framebuffer {
   auto read() const -> Read;
   auto operator == (const Framebuffer & o) const -> bool { return framebuffer_ == o.framebuffer_; }
 
-  static auto New(const GLsizei, const GLsizei, const Color & color = color::black) -> Framebuffer;
+  static auto New(const GLsizei, const GLsizei, const Color & color = colors::black) -> Framebuffer;
 
 private:
   Framebuffer(Framebuffer &) = delete;
@@ -124,6 +124,6 @@ struct Texture {
   GLuint texture_ = 0;
 };
 
-void clear(const GLsizei, const GLsizei, const Color & color = color::black);
+void clear(const GLsizei, const GLsizei, const Color & color = colors::black);
 
 } // end of namespace opengl

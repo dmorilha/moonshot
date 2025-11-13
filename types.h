@@ -16,9 +16,13 @@ struct Color {
 
   template <typename F>
   auto operator () (F && f) const { return f(red, green, blue, alpha); }
+
+  bool operator == (const Color & c) const { return red == c.red && green == c.green && blue == c.blue && alpha == c.alpha; }
+
+  friend std::ostream & operator << (std::ostream &, const Color &);
 };
 
-namespace color {
+namespace colors {
   constexpr static Color black{.red = 0.f, .green = 0.f, .blue = 0.f, .alpha = 1.f};
   constexpr static Color blue{.red = 0.f, .green = 0.f, .blue = 1.f, .alpha = 1.f};
   constexpr static Color cyan{.red = 0.f, .green = 1.f, .blue = 1.f, .alpha = 1.f};

@@ -18,11 +18,9 @@ enum class Style {
 struct RuneFactory;
 
 struct Rune {
-  Color backgroundColor;
-  Color foregroundColor;
+  Color backgroundColor = colors::black;
+  Color foregroundColor = colors::white;
   Style style = Style::REGULAR;
-  bool hasBackgroundColor = false;
-  bool hasForegroundColor = false;
   wchar_t character;
 
   Rune() = default;
@@ -54,12 +52,15 @@ private:
 
 struct RuneFactory {
   Rune make(const wchar_t);
+
   void reset();
-  Color backgroundColor;
-  Color foregroundColor;
-  bool hasBackgroundColor = false;
-  bool hasForegroundColor = false;
+  void resetBackgroundColor() { backgroundColor = colors::black; }
+  void resetForegroundColor() { foregroundColor = colors::white; }
+
+  Color backgroundColor = colors::black;
+  Color foregroundColor = colors::white;
   bool isBold = false;
   bool isItalic = false;
+  bool isUnderlined = false;
 };
 } // end of rune namespace

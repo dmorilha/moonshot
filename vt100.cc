@@ -331,8 +331,11 @@ void vt100::handleSGRCommand(const int command) {
 
   case 7:
     /* inverse colors */
-    assert(!"UNIMPLEMENTED");
-    break;
+    {
+      const Color color = runeFactory_.backgroundColor;
+      runeFactory_.backgroundColor = runeFactory_.foregroundColor;
+      runeFactory_.foregroundColor = color;
+    } break;
 
   case 8:
     /* invisible, hidden, ecma 48 2nd, vt300 */
@@ -396,11 +399,9 @@ void vt100::handleSGRCommand(const int command) {
     {
       const auto iterator = Colors.find(command);
       if (Colors.cend() != iterator) {
-        runeFactory_.hasForegroundColor = true;
         runeFactory_.foregroundColor = iterator->second;
       }
-    }
-    break;
+    } break;
 
   case 38:
     /* foreground color */
@@ -408,7 +409,7 @@ void vt100::handleSGRCommand(const int command) {
 
   case 39:
     /* set foreground color to default, ecma 48 3rd */
-    runeFactory_.hasForegroundColor = false;
+    runeFactory_.resetForegroundColor();
     break;
 
   case 40 ... 47:
@@ -416,11 +417,9 @@ void vt100::handleSGRCommand(const int command) {
     {
       const auto iterator = Colors.find(command);
       if (Colors.cend() != iterator) {
-        runeFactory_.hasBackgroundColor = true;
         runeFactory_.backgroundColor = iterator->second;
       }
-    }
-    break;
+    } break;
 
   case 48:
     /* background color */
@@ -428,7 +427,7 @@ void vt100::handleSGRCommand(const int command) {
 
   case 49:
     /* set background color to default, ecma 48 3rd */
-    runeFactory_.hasBackgroundColor = false;
+    runeFactory_.resetBackgroundColor();
     break;
 
   case 51:
@@ -554,12 +553,12 @@ void vt100::handleCSI(const char c) {
       switch (secondLastCharacter) {
       case '$':
         switch (lastCharacter) {
-          case 'p':
-            assert(!"UNIMPLEMENTED");
-            break;
-          default:
-            assert(!"INVALID ESCAPE SEQUENCE");
-            break;
+        case 'p':
+          assert(!"UNIMPLEMENTED");
+          break;
+        default:
+          assert(!"INVALID ESCAPE SEQUENCE");
+          break;
         }
         break;
       default:
@@ -1169,5 +1168,5 @@ Color vt100::handleSGRColor(const std::vector<const char *> & codes) {
     std::cout << component << ", ";
   }
   std::cout << std::endl;
-  return color::white;
+  return colors::white;
 }

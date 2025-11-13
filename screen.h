@@ -2,11 +2,11 @@
 
 #include <list>
 
-#include "history.h"
 #include "character-map.h"
 #include "dimensions.h"
 #include "font.h"
 #include "freetype.h"
+#include "history.h"
 #include "opengl.h"
 #include "rune.h"
 #include "types.h"
@@ -25,7 +25,7 @@ private:
 public:
   struct Drawer {
     ~Drawer();
-    auto operator () (Rectangle_Y, const uint64_t, const Color & color = {0.f, 0.f, 0.f, 0.f}) -> Rectangle;
+    auto operator () (Rectangle_Y, const uint64_t, const Color &) -> Rectangle;
   private:
     Drawer(Pages & pages);
     Pages & pages_;

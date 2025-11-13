@@ -10,9 +10,6 @@
 #include "types.h"
 
 namespace {
-const float backgroundColor[4] = { 0.f, 0.f, 0.f, 1.f, };
-const float foregroundColor[4] = { 1.f, 1.f, 1.f, 1.f, };
-
 std::ostream & operator << (std::ostream & o, const Screen::Repaint r) {
   switch (r) {
   case Screen::NO:
@@ -124,7 +121,7 @@ void Screen::resize(const uint16_t width, const uint16_t height) {
     recreateFromBuffer(bufferSize - 1);
     repaint_ = FULL;
   } else {
-    opengl::clear(dimensions_.surface_width(), dimensions_.surface_height(), color::black);
+    opengl::clear(dimensions_.surface_width(), dimensions_.surface_height(), colors::black);
     swapBuffers();
   }
 
@@ -180,16 +177,8 @@ void Screen::renderCharacter(const Rectangle & target, const rune::Rune & rune) 
   {
     auto shader = glProgram_.use();
     shader.bind(glUniform1i, "texture", 0);
-    if (rune.hasBackgroundColor) {
-      shader.bind(glUniform3fv, "background", 1, rune.backgroundColor);
-    } else {
-      shader.bind(glUniform3fv, "background", 1, backgroundColor);
-    }
-    if (rune.hasForegroundColor) {
-      shader.bind(glUniform3fv, "color", 1, rune.foregroundColor);
-    } else {
-      shader.bind(glUniform3fv, "color", 1, foregroundColor);
-    }
+    shader.bind(glUniform3fv, "background", 1, rune.backgroundColor);
+    shader.bind(glUniform3fv, "color", 1, rune.foregroundColor);
     shader.bind(glEnableVertexAttribArray, "vpos");
     shader.bind(glVertexAttribPointer, "vpos", 4, GL_FLOAT, GL_FALSE, sizeof(vertices[0]), nullptr);
     glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
@@ -271,7 +260,7 @@ void Screen::repaint(const bool force) {
   assert(0 < dimensions_.surface_width());
 
   if (force || NO != repaint_) {
-    opengl::clear(dimensions_.surface_width(), dimensions_.surface_height(), color::black);
+    opengl::clear(dimensions_.surface_width(), dimensions_.surface_height(), colors::black);
 #if 1
     int32_t height = static_cast<int32_t>(dimensions_.line_to_pixel(dimensions_.displayed_lines() + 1));
     uint64_t offset_y = 0;
@@ -612,7 +601,7 @@ bool Pages::paint(const uint16_t frame) {
 
 void Screen::backspace() {
   auto drawer = pages_.draw();
-  Rectangle target = drawer(static_cast<Rectangle_Y>(dimensions_), 0);
+  Rectangle target = drawer(static_cast<Rectangle_Y>(dimensions_), 0, colors::black);
   target.y = overflow();
   rectangles_.emplace_back(target);
   repaint_ = PARTIAL;
@@ -622,7 +611,7 @@ void Screen::EL() {
   Rectangle_Y rectangle(dimensions_);
   rectangle.width = dimensions_.surface_width() - rectangle.x;
   auto drawer = pages_.draw();
-  Rectangle target = drawer(rectangle, 0);
+  Rectangle target = drawer(rectangle, 0, colors::black);
   target.y = overflow();
   rectangles_.emplace_back(target);
   repaint_ = PARTIAL;
@@ -797,14 +786,14 @@ Pages::Entry & Pages::emplace_front(const int32_t height) {
 Pages::Entry Pages::entry(const Rectangle_Y & rectangle, const uint64_t buffer_index) {
   assert(0 < width_);
   assert(0 < height_);
-#if 0
+#if 1
   const Color color{
     .red = static_cast<float>(drand48()),
     .green = static_cast<float>(drand48()),
     .blue = static_cast<float>(drand48()),
     .alpha = 1.f, };
 #else
-  const Color color = color::black;
+  const Color color = colors::black;
 #endif
   return Entry{
     .framebuffer = opengl::Framebuffer::New(width_, height_, color),

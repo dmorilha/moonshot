@@ -37,17 +37,15 @@ Rune RuneFactory::make(const wchar_t c) {
     rune.style = Style::REGULAR;
   }
 
-  if (hasForegroundColor) {
-    rune.hasForegroundColor = true;
-    rune.foregroundColor = foregroundColor;
-  }
+  rune.foregroundColor = foregroundColor;
+  rune.backgroundColor = backgroundColor;
 
   return rune;
 }
 
 void RuneFactory::reset() {
-  hasBackgroundColor = false;
-  hasForegroundColor = false;
+  resetBackgroundColor();
+  resetForegroundColor();
   isBold = false;
   isItalic = false;
 }

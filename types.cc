@@ -12,6 +12,11 @@ Rectangle_Y::operator Rectangle () const {
   };
 }
 
+std::ostream & operator << (std::ostream & o, const Color & c) {
+  o << "(R:" << c.red << ", G:" << c.green << ", B:" << c.blue << ", A:" << c.alpha << ")";
+  return o;
+}
+
 std::ostream & operator << (std::ostream & o, const Rectangle & r) {
   o << "(" << r.x << "," << r.y << "; " << r.width << "," << r.height << ")";
   return o;
