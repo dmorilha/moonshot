@@ -86,12 +86,13 @@ struct Framebuffer {
 
   struct Read {
     ~Read();
+    auto operator = (Read &&) -> Read & = default;
+
   private:
     Read(const GLuint, const GLuint);
     Read(Read &) = delete;
     Read(Read &&) = delete;
     auto operator = (Read &) -> Read & = delete;
-    auto operator = (Read &&) -> Read & = delete;
     friend class Framebuffer;
   };
 
@@ -101,9 +102,11 @@ struct Framebuffer {
   Framebuffer & operator = (Framebuffer &&);
 
   auto bind() const -> void;
+  auto clone(const GLsizei, const GLsizei) const -> Framebuffer;
   auto draw() const -> Draw;
   auto read() const -> Read;
   auto operator == (const Framebuffer & o) const -> bool { return framebuffer_ == o.framebuffer_; }
+  operator bool () const { return 0 < framebuffer_; }
 
   static auto New(const GLsizei, const GLsizei, const Color & color = colors::black) -> Framebuffer;
 

@@ -15,12 +15,19 @@ enum class Style {
   BOLD_AND_ITALIC,
 };
 
+enum class Blink {
+  STEADY,
+  SLOW,
+  FAST,
+};
+
 struct RuneFactory;
 
 struct Rune {
   Color backgroundColor = colors::black;
   Color foregroundColor = colors::white;
   Style style = Style::REGULAR;
+  Blink blink = Blink::STEADY;
   wchar_t character;
 
   Rune() = default;
@@ -62,5 +69,7 @@ struct RuneFactory {
   bool isBold = false;
   bool isItalic = false;
   bool isUnderlined = false;
+  Blink blink = Blink::STEADY;
 };
+
 } // end of rune namespace

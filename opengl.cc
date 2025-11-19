@@ -210,6 +210,14 @@ Framebuffer Framebuffer::New(const GLsizei width, const GLsizei height, const Co
   return result;
 }
 
+Framebuffer Framebuffer::clone(const GLsizei width, const GLsizei height) const {
+  Framebuffer result = Framebuffer::New(width, height, colors::black);
+  Read reader = read();
+  Draw drawer = result.draw();
+  glCopyPixels(0, 0, width, height, GL_COLOR);
+  return result;
+}
+
 void Framebuffer::bind() const {
   assert(0 != framebuffer_);
   assert(0 != texture_);

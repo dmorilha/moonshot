@@ -316,17 +316,17 @@ void vt100::handleSGRCommand(const int command) {
 
   case 4:
     /* underlined */
-    assert(!"UNIMPLEMENTED");
+    runeFactory_.isUnderlined = true;
     break;
 
   case 5:
     /* slow (less than 150 per minute) blink */
-    assert(!"UNIMPLEMENTED");
+    runeFactory_.blink = rune::Blink::SLOW;
     break;
 
   case 6:
     /* fast blink (ms-dos), most terminals that implement this use the same speed */
-    assert(!"UNIMPLEMENTED");
+    runeFactory_.blink = rune::Blink::FAST;
     break;
 
   case 7:
@@ -369,14 +369,12 @@ void vt100::handleSGRCommand(const int command) {
 
   case 24:
     /* not underlined, ecma 48, 3rd */
-    // r->underlined = false;
-    // r->curlyunderline = false;
-    // r->doubleunderline = false;
+    runeFactory_.isUnderlined = false;
     break;
 
   case 25:
     /* steady (not blinking), ecma 48 3rd */
-    assert(!"UNIMPLEMENTED");
+    runeFactory_.blink = rune::Blink::STEADY;
     break;
 
   case 27:

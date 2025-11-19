@@ -16,6 +16,7 @@ struct Pages {
 private:
   struct Entry {
     opengl::Framebuffer framebuffer;
+    opengl::Framebuffer alternative;
     Rectangle_Y area;
     uint64_t buffer_index = 0;
   };
@@ -25,22 +26,26 @@ private:
 public:
   struct Drawer {
     ~Drawer();
-    auto operator () (Rectangle_Y, const uint64_t, const Color &) -> Rectangle;
+    auto alternative() const -> bool; 
+    auto clear(const Color & color) const -> void;
+    auto create_alternative() const -> void;
+    const Rectangle target;
   private:
-    Drawer(Pages & pages);
-    Pages & pages_;
+    Drawer(const Pages &, Entry &, Rectangle &&);
+    Entry & entry_;
+    const Pages & pages_;
     friend class Pages;
   };
 
   Pages(const uint8_t cap = 0) : cap_(cap) { }
 
-  auto draw() -> Drawer { return Drawer(*this); }; 
+  auto draw(Rectangle_Y, const uint64_t) -> Drawer;
   auto emplace_front(const int32_t) -> Entry &;
   auto first_buffer_index() const -> uint64_t { return container_.empty() ? 0 : container_.front().buffer_index; }
   auto first_y() const -> uint64_t { return container_.empty() ? 0 : container_.front().area.y; }
   auto is_current(Entry & entry) const -> bool { return current_->framebuffer == entry.framebuffer; }
   auto paint(const uint16_t frame = 0) -> bool;
-  auto repaint(const Rectangle, const uint64_t) -> void;
+  auto repaint(const Rectangle, const uint64_t, const bool alt = false) -> void;
   auto reset(const uint16_t, const uint16_t) -> void;
   auto total_height() const -> uint32_t;
 
@@ -50,7 +55,7 @@ public:
 
 private:
   auto entry(const Rectangle_Y &, const uint64_t) -> Entry;
-  auto update(Rectangle_Y &, const uint64_t) -> void;
+  auto update(Rectangle_Y &, const uint64_t) -> Entry &;
 
   Container container_;
   Container::iterator current_ = container_.end();
@@ -94,7 +99,7 @@ struct Screen {
   auto getLines() const -> int32_t { return dimensions_.lines(); }
   auto pushBack(rune::Rune &&) -> void;
   auto recreateFromBuffer(const uint64_t index) -> void;
-  auto repaint(const bool force = false) -> void;
+  auto repaint(const bool force = false, const bool alt = false) -> void;
   auto resetScroll() -> void { dimensions_.scroll_y(0); }
   auto resize(const uint16_t, const uint16_t) -> void;
   auto setCursor(const uint16_t, const uint16_t) -> void;

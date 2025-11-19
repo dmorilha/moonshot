@@ -149,7 +149,6 @@ void Screen::changeScrollY(int32_t value) {
 
 void Screen::renderCharacter(const Rectangle & target, const rune::Rune & rune) {
   const Character & character = characters_.retrieve(rune);
-
   const float vertex_bottom = pages_.scale_height() * (target.y + character.top - (dimensions_.glyph_descender() + character.height));
   const float vertex_left = pages_.scale_width() * (target.x + character.left);
   const float vertex_right = pages_.scale_width() * (target.x + character.left + character.width);
@@ -244,18 +243,32 @@ void Screen::pushBack(rune::Rune && rune) {
   rectangle.width = width;
 
   {
-    Pages::Drawer drawer = pages_.draw();
-    Rectangle target = drawer(rectangle, buffer_index, rune.backgroundColor);
-    renderCharacter(target, rune);
-    target.y = overflow();
-    rectangles_.emplace_back(std::move(target));
+    const auto drawer = pages_.draw(rectangle, buffer_index);
+    drawer.clear(rune.backgroundColor);
+    renderCharacter(drawer.target, rune);
+
+    if (rune::Blink::STEADY != rune.blink) {
+      drawer.create_alternative();
+      rune.foregroundColor = rune.backgroundColor;
+    }
+
+    if (drawer.alternative()) {
+      drawer.clear(rune.backgroundColor);
+      renderCharacter(drawer.target, rune);
+    }
+
+    rectangles_.emplace_back(Rectangle{
+      .x = drawer.target.x,
+      .y = overflow(),
+      .width = drawer.target.width,
+      .height = drawer.target.height, });
   }
 
   dimensions_.cursor_column(dimensions_.cursor_column() + columns);
 }
 
 //TODO: make sure there is no parallel execution here.
-void Screen::repaint(const bool force) {
+void Screen::repaint(const bool force, const bool alt) {
   assert(0 < dimensions_.surface_height());
   assert(0 < dimensions_.surface_width());
 
@@ -288,12 +301,9 @@ void Screen::repaint(const bool force) {
       }
 
     }
-    pages_.repaint(Rectangle{
-        .x = 0,
-        .y = 0,
-        .width = dimensions_.surface_width(),
-        .height = height,
-        }, offset_y);
+    pages_.repaint(
+      Rectangle{ .x = 0, .y = 0, .width = dimensions_.surface_width(), .height = height, },
+      offset_y, alt);
 #else
     pages_.paint(0);
 #endif
@@ -338,10 +348,23 @@ Pages::Drawer::~Drawer() {
   glBindTexture(GL_TEXTURE_2D, 0);
 }
 
-Pages::Drawer::Drawer(Pages & pages) : pages_(pages) {
-  if (pages_.container_.end() != pages_.current_) {
-    pages_.current_->framebuffer.bind();
+Pages::Drawer::Drawer(const Pages & p, Entry & e, Rectangle && r) : pages_(p), entry_(e), target(std::move(r)) {
+  entry_.framebuffer.bind();
+}
+
+bool Pages::Drawer::alternative() const {
+  const bool result = entry_.alternative;
+  if (result) {
+    entry_.alternative.bind();
   }
+  return result;
+}
+
+void Pages::Drawer::create_alternative() const {
+  if ( ! entry_.alternative) {
+    entry_.alternative = entry_.framebuffer.clone(pages_.width_, pages_.height_);
+  }
+  entry_.alternative.bind();
 }
 
 uint32_t Pages::total_height() const {
@@ -352,16 +375,19 @@ uint32_t Pages::total_height() const {
   return result;
 }
 
-Rectangle Pages::Drawer::operator () (Rectangle_Y rectangle, const uint64_t buffer_index, const Color & color) {
-  assert(pages_.height_ >= rectangle.height);
-  assert(pages_.width_ >= rectangle.width);
-  pages_.update(rectangle, buffer_index);
+void Pages::Drawer::clear(const Color & color) const {
   glEnable(GL_SCISSOR_TEST);
-  rectangle(glScissor);
+  target(glScissor);
   color(glClearColor);
   glClear(GL_COLOR_BUFFER_BIT);
   glDisable(GL_SCISSOR_TEST);
-  return static_cast<Rectangle>(rectangle);
+}
+
+Pages::Drawer Pages::draw(Rectangle_Y rectangle, const uint64_t buffer_index) {
+  assert(height_ >= rectangle.height);
+  assert(width_ >= rectangle.width);
+  Entry & entry = update(rectangle, buffer_index);
+  return Drawer(*this, entry, static_cast<Rectangle>(rectangle));
 }
 
 void Pages::reset(const uint16_t width, const uint16_t height) {
@@ -371,7 +397,7 @@ void Pages::reset(const uint16_t width, const uint16_t height) {
   current_ = container_.end();
 }
 
-void Pages::update(Rectangle_Y & rectangle, const uint64_t buffer_index) {
+Pages::Entry & Pages::update(Rectangle_Y & rectangle, const uint64_t buffer_index) {
   bool found = false;
 
   // cache hit, skip a look-up
@@ -417,13 +443,14 @@ void Pages::update(Rectangle_Y & rectangle, const uint64_t buffer_index) {
 
     // if it did not find a page, insert a new page at the end.
     current_ = container_.emplace(container_.end(), entry(rectangle, buffer_index));
-
-    current_->framebuffer.bind();
   }
   rectangle.y = height_ - (rectangle.y - current_->area.y) - rectangle.height;
+
+  assert(container_.end() != current_);
+  return *current_;
 }
 
-void Pages::repaint(const Rectangle rectangle, const uint64_t offset_y) {
+void Pages::repaint(const Rectangle rectangle, const uint64_t offset_y, const bool alt) {
   assert(0 == rectangle.x);
   assert(width_ >= rectangle.width);
   const auto END = container_.end();
@@ -478,7 +505,10 @@ void Pages::repaint(const Rectangle rectangle, const uint64_t offset_y) {
 #endif
 
       {
-        const auto read = iterator->framebuffer.read();
+        auto read = iterator->framebuffer.read();
+        if (alt && iterator->alternative) {
+          read = iterator->alternative.read();
+        }
 
         GLuint vertex_buffer = 0;
         glGenBuffers(1, &vertex_buffer);
@@ -540,7 +570,10 @@ void Pages::repaint(const Rectangle rectangle, const uint64_t offset_y) {
 #endif
 
       {
-        const auto read = iterator->framebuffer.read();
+        auto read = iterator->framebuffer.read();
+        if (alt && iterator->alternative) {
+          read = iterator->alternative.read();
+        }
 
         GLuint vertex_buffer = 0;
         glGenBuffers(1, &vertex_buffer);
@@ -600,20 +633,26 @@ bool Pages::paint(const uint16_t frame) {
 }
 
 void Screen::backspace() {
-  auto drawer = pages_.draw();
-  Rectangle target = drawer(static_cast<Rectangle_Y>(dimensions_), 0, colors::black);
-  target.y = overflow();
-  rectangles_.emplace_back(target);
+  const auto drawer = pages_.draw(static_cast<Rectangle_Y>(dimensions_), 0);
+  drawer.clear(colors::black);
+  rectangles_.emplace_back(Rectangle{
+    .x = drawer.target.x,
+    .y = overflow(),
+    .width = drawer.target.width,
+    .height = drawer.target.height,});
   repaint_ = PARTIAL;
 }
 
 void Screen::EL() {
   Rectangle_Y rectangle(dimensions_);
   rectangle.width = dimensions_.surface_width() - rectangle.x;
-  auto drawer = pages_.draw();
-  Rectangle target = drawer(rectangle, 0, colors::black);
-  target.y = overflow();
-  rectangles_.emplace_back(target);
+  const auto drawer = pages_.draw(rectangle, 0);
+  drawer.clear(colors::black);
+  rectangles_.emplace_back(Rectangle{
+    .x = drawer.target.x,
+    .y = overflow(),
+    .width = drawer.target.width,
+    .height = drawer.target.height,});
   repaint_ = PARTIAL;
 }
 

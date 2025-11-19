@@ -13,19 +13,29 @@ struct WaylandPoller : public Events {
   void pollin() override;
   void timeout() override;
 private:
+  constexpr auto millis() -> uint16_t {
+    const auto now = std::chrono::steady_clock::now();
+    const uint16_t millis = (now.time_since_epoch().count() / 1000000) % 1000;
+    return millis;
+  }
+
   PAINT paint;
+  bool alternative_ = false;
   wayland::Connection & connection_;
 };
 
 template<class PAINT>
 void WaylandPoller<PAINT>::pollin() {
-  paint();
+  const bool flip = 500 <= millis();
+  const bool force = alternative_ ^ flip;
+  alternative_ = flip;
+  paint(force, alternative_);
   connection_.roundtrip();
 }
 
 template<class PAINT>
 void WaylandPoller<PAINT>::timeout() {
-  paint();
+  pollin();
 }
 
 int main(int argc, char ** argv) {
@@ -39,14 +49,15 @@ int main(int argc, char ** argv) {
 
   connection.roundtrip();
 
-  Poller poller(/* timeout for 60 fps */ 16ms);
+  Poller poller(/* timeout for 100 fps */ 10ms);
 
   auto t = Terminal::New(&screen);
   const int fd = t->childfd();
 
   Terminal & terminal = poller.add(fd, std::move(t));
-  poller.add(connection.fd(), std::unique_ptr<Events>(new WaylandPoller(connection, [&](const bool force = false) {
-    screen.repaint(force);
+
+  poller.add(connection.fd(), std::unique_ptr<Events>(new WaylandPoller(connection, [&](const bool force, const bool alt) {
+    screen.repaint(force, alt);
   })));
 
   connection.onKeyPress = [&](const uint32_t key, const char * const utf8, const size_t bytes, const uint32_t modifiers) {

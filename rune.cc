@@ -39,15 +39,13 @@ Rune RuneFactory::make(const wchar_t c) {
 
   rune.foregroundColor = foregroundColor;
   rune.backgroundColor = backgroundColor;
+  rune.blink = blink;
 
   return rune;
 }
 
 void RuneFactory::reset() {
-  resetBackgroundColor();
-  resetForegroundColor();
-  isBold = false;
-  isItalic = false;
+  operator = (RuneFactory());
 }
 
 } // end of rune namespace
