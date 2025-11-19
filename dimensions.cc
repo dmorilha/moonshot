@@ -58,7 +58,7 @@ void Dimensions::set_cursor(const uint16_t column, const uint16_t line) {
   cursor_line_ = line;
 }
 
-Dimensions::operator Rectangle_Y () {
+Dimensions::operator Rectangle_Y () const {
   assert(0 < glyph_width_);
   assert(0 < cursor_line_);
   assert(0 < line_height_);
@@ -67,6 +67,27 @@ Dimensions::operator Rectangle_Y () {
   return {
     .x = column_to_pixel(cursor_column_),
     .y = line_to_pixel(scrollback_lines_ + cursor_line_),
+    .width = glyph_width_,
+    .height = line_height_,
+  };
+}
+
+Dimensions::operator Rectangle () const {
+  assert(0 < surface_height_);
+  assert(0 < glyph_width_);
+  assert(0 < cursor_line_);
+  assert(0 < line_height_);
+  assert(0 < cursor_column_);
+
+  int32_t y = surface_height_ - static_cast<int32_t>(line_to_pixel(cursor_line_ + 1));
+
+  if (overflow_) {
+    y -= remainder();
+  }
+
+  return {
+    .x = column_to_pixel(cursor_column_),
+    .y = y,
     .width = glyph_width_,
     .height = line_height_,
   };

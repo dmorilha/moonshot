@@ -267,7 +267,7 @@ void Screen::pushBack(rune::Rune && rune) {
     break;
   }
 
-  Rectangle_Y rectangle = dimensions_;
+  Rectangle_Y rectangle = static_cast<Rectangle_Y>(dimensions_);
   rectangle.width = width;
 
   {
@@ -340,6 +340,11 @@ void Screen::repaint(const bool force, const bool alternative) {
 #else
     pages_.paint(0);
 #endif
+
+    if (alternative) {
+      cursor(dimensions_.scroll_y());
+    }
+
     const bool forceSwapBuffers = force || rectangles_.empty() || FULL == repaint_;
     swapBuffers(forceSwapBuffers);
   }
@@ -889,3 +894,14 @@ bool Pages::has_alternative() const {
   return result;
 }
 
+void Screen::cursor(const uint64_t offset) const {
+  Rectangle target{static_cast<Rectangle>(dimensions_)};
+  if (0 < offset) {
+    return;
+  }
+  glEnable(GL_SCISSOR_TEST);
+  target(glScissor);
+  colors::white(glClearColor);
+  glClear(GL_COLOR_BUFFER_BIT);
+  glDisable(GL_SCISSOR_TEST);
+}

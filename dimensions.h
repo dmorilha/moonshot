@@ -41,7 +41,8 @@ public:
   auto surface_width() const { return surface_width_; }
   auto wrap_next() const { return wrap_next_; }
 
-  operator Rectangle_Y ();
+  explicit operator Rectangle () const;
+  explicit operator Rectangle_Y () const;
 
   constexpr int32_t column_to_pixel(const uint16_t column) const {
     assert(0 < glyph_width_);

@@ -88,19 +88,18 @@ struct Screen {
   Screen & operator = (const Screen &) = delete;
   Screen & operator = (Screen && other) = delete;
 
+  auto EL() -> void;
   auto backspace() -> void;
   auto changeScrollY(int32_t) -> void;
   auto clear() -> void;
   auto clearScrollback() -> void;
   auto drag(const uint16_t, const uint16_t) -> void;
-  auto EL() -> void;
   auto endSelection() -> void;
   auto getColumn() const -> int32_t { return dimensions_.cursor_column(); }
   auto getColumns() const -> int32_t { return dimensions_.columns(); }
   auto getLine() const -> int32_t { return dimensions_.cursor_line(); }
   auto getLines() const -> int32_t { return dimensions_.lines(); }
   auto pushBack(rune::Rune &&) -> void;
-  auto recreateFromBuffer(const uint64_t index) -> void;
   auto repaint(const bool force = false, const bool alternative = false) -> void;
   auto resetScroll() -> void { dimensions_.scroll_y(0); }
   auto resize(const uint16_t, const uint16_t) -> void;
@@ -114,11 +113,13 @@ struct Screen {
 private:
   Screen(std::unique_ptr<wayland::Surface> &&);
 
-  auto history() -> History & { return history_; }
   auto countLines(History::ReverseIterator &, const History::ReverseIterator &, const uint64_t limit = 0) const -> uint64_t;
+  auto cursor(const uint64_t) const -> void;
   auto draw() -> void;
+  auto history() -> History & { return history_; }
   auto makeCurrent() const -> void { surface_->egl().makeCurrent(); }
   auto overflow() -> int32_t;
+  auto recreateFromBuffer(const uint64_t index) -> void;
   auto renderCharacter(const Rectangle &, const rune::Rune &) -> void;
   auto select(const Rectangle & rectangle) -> void;
   auto swapBuffers(const bool full = true) -> void;
