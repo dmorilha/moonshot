@@ -315,8 +315,8 @@ void vt100::handleSGRCommand(const int command) {
     break;
 
   case 4:
-    /* underlined */
-    runeFactory_.isUnderlined = true;
+    /* underline */
+    runeFactory_.underline = true;
     break;
 
   case 5:
@@ -344,7 +344,7 @@ void vt100::handleSGRCommand(const int command) {
 
   case 9:
     /* crossed-out characters, ecma 48 3rd */
-    assert(!"UNIMPLEMENTED");
+    runeFactory_.crossout = true;
     break;
 
   case 20:
@@ -369,7 +369,7 @@ void vt100::handleSGRCommand(const int command) {
 
   case 24:
     /* not underlined, ecma 48, 3rd */
-    runeFactory_.isUnderlined = false;
+    runeFactory_.underline = false;
     break;
 
   case 25:
@@ -389,7 +389,7 @@ void vt100::handleSGRCommand(const int command) {
 
   case 29:
     /* not crossed-out, ecma 48 3rd */
-    assert(!"UNIMPLEMENTED");
+    runeFactory_.crossout = false;
     break;
 
   case 30 ... 37:

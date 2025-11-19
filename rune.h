@@ -28,6 +28,8 @@ struct Rune {
   Color foregroundColor = colors::white;
   Style style = Style::REGULAR;
   Blink blink = Blink::STEADY;
+  bool crossout = false;
+  bool underline = false;
   wchar_t character;
 
   Rune() = default;
@@ -66,9 +68,10 @@ struct RuneFactory {
 
   Color backgroundColor = colors::black;
   Color foregroundColor = colors::white;
+  bool crossout = false;
   bool isBold = false;
   bool isItalic = false;
-  bool isUnderlined = false;
+  bool underline = false;
   Blink blink = Blink::STEADY;
 };
 

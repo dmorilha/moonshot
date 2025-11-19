@@ -41,12 +41,14 @@ public:
 
   auto draw(Rectangle_Y, const uint64_t) -> Drawer;
   auto emplace_front(const int32_t) -> Entry &;
-  auto first_buffer_index() const -> uint64_t { return container_.empty() ? 0 : container_.front().buffer_index; }
-  auto first_y() const -> uint64_t { return container_.empty() ? 0 : container_.front().area.y; }
   auto is_current(Entry & entry) const -> bool { return current_->framebuffer == entry.framebuffer; }
   auto paint(const uint16_t frame = 0) -> bool;
-  auto repaint(const Rectangle, const uint64_t, const bool alt = false) -> void;
+  auto repaint(const Rectangle, const uint64_t, const bool alternative = false) -> void;
   auto reset(const uint16_t, const uint16_t) -> void;
+
+  auto has_alternative() const -> bool;
+  auto first_buffer_index() const -> uint64_t { return container_.empty() ? 0 : container_.front().buffer_index; }
+  auto first_y() const -> uint64_t { return container_.empty() ? 0 : container_.front().area.y; }
   auto total_height() const -> uint32_t;
 
   constexpr auto height() const { return height_; }
@@ -99,7 +101,7 @@ struct Screen {
   auto getLines() const -> int32_t { return dimensions_.lines(); }
   auto pushBack(rune::Rune &&) -> void;
   auto recreateFromBuffer(const uint64_t index) -> void;
-  auto repaint(const bool force = false, const bool alt = false) -> void;
+  auto repaint(const bool force = false, const bool alternative = false) -> void;
   auto resetScroll() -> void { dimensions_.scroll_y(0); }
   auto resize(const uint16_t, const uint16_t) -> void;
   auto setCursor(const uint16_t, const uint16_t) -> void;

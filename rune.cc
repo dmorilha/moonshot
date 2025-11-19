@@ -37,9 +37,11 @@ Rune RuneFactory::make(const wchar_t c) {
     rune.style = Style::REGULAR;
   }
 
-  rune.foregroundColor = foregroundColor;
   rune.backgroundColor = backgroundColor;
   rune.blink = blink;
+  rune.crossout = crossout;
+  rune.foregroundColor = foregroundColor;
+  rune.underline = underline;
 
   return rune;
 }

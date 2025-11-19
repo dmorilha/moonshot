@@ -185,6 +185,34 @@ void Screen::renderCharacter(const Rectangle & target, const rune::Rune & rune) 
 
   glDeleteBuffers(1, &vertex_buffer);
   glActiveTexture(GL_TEXTURE0);
+
+  if (rune.crossout) {
+    const Rectangle crossout {
+      .x = target.x,
+      .y = target.y + dimensions_.line_height() / 2,
+      .width = target.width,
+      .height = 1,
+    };
+    glEnable(GL_SCISSOR_TEST);
+    crossout(glScissor);
+    rune.foregroundColor(glClearColor);
+    glClear(GL_COLOR_BUFFER_BIT);
+    glDisable(GL_SCISSOR_TEST);
+  }
+
+  if (rune.underline) {
+    const Rectangle underline {
+      .x = target.x,
+      .y = target.y + 2,
+      .width = target.width,
+      .height = 1,
+    };
+    glEnable(GL_SCISSOR_TEST);
+    underline(glScissor);
+    rune.foregroundColor(glClearColor);
+    glClear(GL_COLOR_BUFFER_BIT);
+    glDisable(GL_SCISSOR_TEST);
+  }
 }
 
 void Screen::pushBack(rune::Rune && rune) {
@@ -268,7 +296,7 @@ void Screen::pushBack(rune::Rune && rune) {
 }
 
 //TODO: make sure there is no parallel execution here.
-void Screen::repaint(const bool force, const bool alt) {
+void Screen::repaint(const bool force, const bool alternative) {
   assert(0 < dimensions_.surface_height());
   assert(0 < dimensions_.surface_width());
 
@@ -302,8 +330,13 @@ void Screen::repaint(const bool force, const bool alt) {
 
     }
     pages_.repaint(
-      Rectangle{ .x = 0, .y = 0, .width = dimensions_.surface_width(), .height = height, },
-      offset_y, alt);
+      Rectangle{
+        .x = 0,
+        .y = 0,
+        .width = dimensions_.surface_width(),
+        .height = height, },
+      offset_y,
+      alternative);
 #else
     pages_.paint(0);
 #endif
@@ -364,7 +397,6 @@ void Pages::Drawer::create_alternative() const {
   if ( ! entry_.alternative) {
     entry_.alternative = entry_.framebuffer.clone(pages_.width_, pages_.height_);
   }
-  entry_.alternative.bind();
 }
 
 uint32_t Pages::total_height() const {
@@ -845,3 +877,15 @@ Pages::Entry Pages::entry(const Rectangle_Y & rectangle, const uint64_t buffer_i
     .buffer_index = buffer_index,
     };
 }
+
+bool Pages::has_alternative() const {
+  bool result = false;
+  for (const auto & entry : container_) {
+    result |= entry.alternative;
+    if (result) {
+      break;
+    }
+  }
+  return result;
+}
+
