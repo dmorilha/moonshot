@@ -24,7 +24,7 @@ struct Color {
 
 namespace colors {
   constexpr static Color black{.red = 0.f, .green = 0.f, .blue = 0.f, .alpha = 1.f};
-  constexpr static Color blue{.red = 0.f, .green = 0.f, .blue = 1.f, .alpha = 1.f};
+  constexpr static Color blue{.red = 0.4f, .green = 0.4f, .blue = 1.f, .alpha = 1.f};
   constexpr static Color cyan{.red = 0.f, .green = 1.f, .blue = 1.f, .alpha = 1.f};
   constexpr static Color green{.red = 0.f, .green = 1.f, .blue = 0.f, .alpha = 1.f};
   constexpr static Color magenta{.red = 1.f, .green = 0.f, .blue = 1.f, .alpha = 1.f};
