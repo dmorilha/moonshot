@@ -6,7 +6,7 @@
 #include "terminal.h"
 
 struct vt100 : public Terminal {
-  vt100(Screen * const);
+  vt100(Screen &);
 
   const std::map<int, Color> Colors {
     {30, colors::black},

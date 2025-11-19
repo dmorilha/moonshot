@@ -51,7 +51,7 @@ int main(int argc, char ** argv) {
 
   Poller poller(/* timeout for 100 fps */ 10ms);
 
-  auto t = Terminal::New(&screen);
+  auto t = Terminal::New(screen);
   const int fd = t->childfd();
 
   Terminal & terminal = poller.add(fd, std::move(t));

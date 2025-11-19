@@ -11,7 +11,7 @@
 struct Screen;
 
 struct Terminal : public Events {
-  static std::unique_ptr<Terminal> New(Screen * const);
+  static std::unique_ptr<Terminal> New(Screen &);
 
   int childfd() const;
   void pollhup() override;
@@ -20,9 +20,9 @@ struct Terminal : public Events {
   void write(const char * const, const size_t);
 
 protected:
-  Terminal(Screen * const);
+  Terminal(Screen &);
   const static std::string path;
-  Screen * const screen_ = nullptr;
+  Screen & screen_;
   struct winsize winsize_{
     .ws_row = 0,
     .ws_col = 0,

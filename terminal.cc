@@ -20,7 +20,7 @@
 
 const std::string Terminal::path = "/bin/bash";
 
-Terminal::Terminal(Screen * const screen) : Events(POLLIN | POLLHUP), screen_(screen) { }
+Terminal::Terminal(Screen & screen) : Events(POLLIN | POLLHUP), screen_(screen) { }
 
 /* pollin should:
  *  - be broken into a generic piece towards reuse.
@@ -28,8 +28,6 @@ Terminal::Terminal(Screen * const screen) : Events(POLLIN | POLLHUP), screen_(sc
  *    for further processing.
  */
 void Terminal::pollin() {
-  assert(nullptr != screen_);
-
   ssize_t length = 0;
   {
     const ssize_t result = read(fd_.child, buffer_.data() + bufferStart_, buffer_.size() - bufferStart_);
@@ -72,7 +70,7 @@ void Terminal::pollin() {
         bufferStart_ = 0;
         break;
       default:
-        screen_->pushBack(rune::Rune{character});
+        screen_.pushBack(rune::Rune{character});
         iterator += bytes;
         bufferStart_ = 0;
         break;
@@ -102,9 +100,8 @@ int Terminal::childfd() const {
   return fd_.child;
 }
 
-std::unique_ptr<Terminal> Terminal::New(Screen * const screen) {
+std::unique_ptr<Terminal> Terminal::New(Screen & screen) {
   std::unique_ptr<Terminal> instance = nullptr;
-  assert(nullptr != screen);
 
   const char * const TERM = getenv("TERM");
   std::string terminalType;
@@ -127,8 +124,8 @@ std::unique_ptr<Terminal> Terminal::New(Screen * const screen) {
     instance = std::unique_ptr<Terminal>(new vt100(screen));
   }
 
-  instance->winsize_.ws_col = screen->getColumns();
-  instance->winsize_.ws_row = screen->getLines();
+  instance->winsize_.ws_col = screen.getColumns();
+  instance->winsize_.ws_row = screen.getLines();
 
   openpty(&instance->fd_.child, &instance->fd_.parent, nullptr, nullptr, &instance->winsize_);
 
@@ -162,11 +159,10 @@ void Terminal::write(const char * const key, const size_t length) {
 }
 
 void Terminal::resize(int32_t, int32_t) {
-  assert(nullptr != screen_);
-  if (screen_->getColumns() != winsize_.ws_col
-    || screen_->getLines() != winsize_.ws_row) {
-    winsize_.ws_col = screen_->getColumns();
-    winsize_.ws_row = screen_->getLines();
+  if (screen_.getColumns() != winsize_.ws_col
+    || screen_.getLines() != winsize_.ws_row) {
+    winsize_.ws_col = screen_.getColumns();
+    winsize_.ws_row = screen_.getLines();
     assert(0 < fd_.child);
     const int result = ioctl(fd_.child, TIOCSWINSZ, &winsize_);
     assert(0 == result);

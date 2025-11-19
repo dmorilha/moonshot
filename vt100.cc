@@ -8,11 +8,10 @@
 #include "screen.h"
 #include "vt100.h"
 
-vt100::vt100(Screen * const screen) : Terminal(screen) { }
+vt100::vt100(Screen & screen) : Terminal(screen) { }
 
 void vt100::pollin() {
   std::array<char, 1025> buffer{'\0'};
-  assert(nullptr != screen_);
   ssize_t length = read(fd_.child, buffer.data(), buffer.size() - 1);
   while (0 < length) {
     for (std::size_t i = 0; i < length; ++i) {
@@ -633,7 +632,7 @@ void vt100::handleCSI(const char c) {
 
       case 'K':
         /* EL - clear(erase) line right of cursor */
-        screen_->EL();
+        screen_.EL();
         break;
 
       case '@':
@@ -702,15 +701,15 @@ void vt100::handleCSI(const char c) {
         {
           const std::size_t size = escapeSequence_.size();
           if (2 == size) {
-            screen_->clear();
+            screen_.clear();
           } else if (3 == size)  {
             int32_t argument = std::atoi(escapeSequence_.data());
             switch (argument) {
             case 2:
-              screen_->clear();
+              screen_.clear();
               break;
             case 3:
-              screen_->clearScrollback();
+              screen_.clearScrollback();
               break;
             default:
               assert(!"UNIMPLEMENTED");
@@ -737,7 +736,7 @@ void vt100::handleCSI(const char c) {
             assert(';' == delimiter);
             stream >> bottom;
             top = std::max<int64_t>(1, top);
-            bottom = 1 > bottom ? screen_->getLines() - 1 : bottom;
+            bottom = 1 > bottom ? screen_.getLines() - 1 : bottom;
             --top;
             --bottom;
             std::cout << top << ", " << bottom << std::endl;
@@ -746,7 +745,7 @@ void vt100::handleCSI(const char c) {
           }
 
           if (bottom > top) {
-            screen_->setCursor(1, 1);
+            screen_.setCursor(1, 1);
           } else {
             assert(!"invalid DECSTBM sequence");
           }
@@ -796,10 +795,10 @@ void vt100::handleCSI(const char c) {
             stream >> line;
             column = std::max<uint16_t>(1, column);
             line = std::max<uint16_t>(1, line);
-            assert(screen_->getLines() >= line);
-            assert(screen_->getColumns() >= column);
+            assert(screen_.getLines() >= line);
+            assert(screen_.getColumns() >= column);
           }
-          screen_->setCursor(column, line);
+          screen_.setCursor(column, line);
         } break;
 
       case 'c':
@@ -904,7 +903,7 @@ void vt100::handleOSC(const char c) {
       /* change window title */
       {
         const std::string title = escapeSequence_.data() + 2;
-        screen_->setTitle(title);
+        screen_.setTitle(title);
       } break;
 
     default:
@@ -929,7 +928,7 @@ void vt100::handleCharacter(const char c) {
       state_ = ESCAPE;
       break;
     default:
-      screen_->pushBack(runeFactory_.make(c));
+      screen_.pushBack(runeFactory_.make(c));
       break;
     }
     break;
@@ -1152,7 +1151,7 @@ void vt100::handleCharacter(const char c) {
 void vt100::reportDeviceStatus(const int32_t argument) {
   switch (argument) {
   case 6:
-    // std::cout << screen_->getColumn() << " " << screen_->getLine() << std::endl;
+    // std::cout << screen_.getColumn() << " " << screen_.getLine() << std::endl;
     // I don't know what should be done here.
     break;
   default:
