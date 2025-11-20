@@ -42,8 +42,18 @@ struct Rectangle {
 
   operator const int * () const { return reinterpret_cast< const int * >(this); }
 
+  auto operator < (const Rectangle &) const -> bool;
+
   template <typename F>
   auto operator () (F && f) const { return f(x, y, width, height); }
+
+  auto x1() const { return x + width; }
+  auto y1() const { return y + height; }
+
+  auto area() const -> int32_t { return width * height; }
+  auto contains(const Rectangle &) const -> bool;
+  auto /* bad naming */ incorporate(const Rectangle &) -> bool;
+  auto overlaps(const Rectangle &) const -> bool;
 
   friend std::ostream & operator << (std::ostream &, const Rectangle &);
 };

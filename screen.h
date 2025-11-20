@@ -1,6 +1,7 @@
 #pragma once
 
 #include <list>
+#include <set>
 
 #include "character-map.h"
 #include "dimensions.h"
@@ -11,6 +12,23 @@
 #include "rune.h"
 #include "types.h"
 #include "wayland.h"
+
+struct Damage {
+  using Container = std::set<Rectangle>;
+  auto area() const -> uint32_t;
+  auto clear() -> void { container_.clear(); }
+  auto emplace(Rectangle &&) -> void;
+  auto empty() const -> bool { return container_.empty(); }
+
+  template <typename Container>
+  void transfer(Container & c) {
+    while ( ! container_.empty()) {
+      c.emplace(c.cend(), container_.extract(container_.begin()).value());
+    }
+  }
+
+  Container container_;
+};
 
 struct Pages {
 private:
@@ -90,9 +108,11 @@ struct Screen {
 
   auto EL() -> void;
   auto backspace() -> void;
+  auto begin() -> void { }
   auto changeScrollY(int32_t) -> void;
   auto clear() -> void;
   auto clearScrollback() -> void;
+  auto commit() -> void { }
   auto drag(const uint16_t, const uint16_t) -> void;
   auto endSelection() -> void;
   auto getColumn() const -> int32_t { return dimensions_.cursor_column(); }
@@ -111,6 +131,7 @@ struct Screen {
   std::function<void (int32_t, int32_t)> onResize;
 
 private:
+
   Screen(std::unique_ptr<wayland::Surface> &&);
 
   auto countLines(History::ReverseIterator &, const History::ReverseIterator &, const uint64_t limit = 0) const -> uint64_t;
@@ -122,14 +143,14 @@ private:
   auto recreateFromBuffer(const uint64_t index) -> void;
   auto renderCharacter(const Rectangle &, const rune::Rune &) -> void;
   auto select(const Rectangle & rectangle) -> void;
-  auto swapBuffers(const bool full = true) -> void;
+  auto swapBuffers(bool fullSwap = true) -> void;
 
-  std::unique_ptr<wayland::Surface> surface_;
-  opengl::Shader glProgram_;
-  Pages pages_{/* total number of entries */ 3};
-  std::list<Rectangle> rectangles_;
-  History history_;
-  Repaint repaint_ = NO;
-  Dimensions dimensions_;
   CharacterMap characters_;
+  Dimensions dimensions_;
+  History history_;
+  Pages pages_{/* total number of entries */ 3};
+  Damage damage_;
+  Repaint repaint_ = NO;
+  opengl::Shader glProgram_;
+  std::unique_ptr<wayland::Surface> surface_;
 };

@@ -285,7 +285,7 @@ void Screen::pushBack(rune::Rune && rune) {
       renderCharacter(drawer.target, rune);
     }
 
-    rectangles_.emplace_back(Rectangle{
+    damage_.emplace(Rectangle{
       .x = drawer.target.x,
       .y = overflow(),
       .width = drawer.target.width,
@@ -345,24 +345,22 @@ void Screen::repaint(const bool force, const bool alternative) {
       cursor(dimensions_.scroll_y());
     }
 
-    const bool forceSwapBuffers = force || rectangles_.empty() || FULL == repaint_;
+    const bool forceSwapBuffers = force || damage_.empty() || FULL == repaint_;
     swapBuffers(forceSwapBuffers);
   }
   repaint_ = NO;
 }
 
-void Screen::swapBuffers(const bool full) {
-  if ( ! full && ! rectangles_.empty()) {
-    // it may compress the rectangles
+void Screen::swapBuffers(bool fullSwap) {
+  fullSwap |= damage_.area() * 2 >= dimensions_.area();
+  if ( ! fullSwap && ! damage_.empty()) {
     std::vector<Rectangle> rectangles;
-    for (auto && item : rectangles_) {
-      rectangles.emplace_back(std::move(item));
-    }
+    damage_.transfer(rectangles);
     surface_->egl().swapBuffers(rectangles);
   } else {
     surface_->egl().swapBuffers();
   }
-  rectangles_.clear();
+  damage_.clear();
 }
 
 void Screen::setCursor(const uint16_t column, const uint16_t line) {
@@ -672,7 +670,7 @@ bool Pages::paint(const uint16_t frame) {
 void Screen::backspace() {
   const auto drawer = pages_.draw(static_cast<Rectangle_Y>(dimensions_), 0);
   drawer.clear(colors::black);
-  rectangles_.emplace_back(Rectangle{
+  damage_.emplace(Rectangle{
     .x = drawer.target.x,
     .y = overflow(),
     .width = drawer.target.width,
@@ -685,7 +683,7 @@ void Screen::EL() {
   rectangle.width = dimensions_.surface_width() - rectangle.x;
   const auto drawer = pages_.draw(rectangle, 0);
   drawer.clear(colors::black);
-  rectangles_.emplace_back(Rectangle{
+  damage_.emplace(Rectangle{
     .x = drawer.target.x,
     .y = overflow(),
     .width = drawer.target.width,
@@ -904,4 +902,33 @@ void Screen::cursor(const uint64_t offset) const {
   colors::white(glClearColor);
   glClear(GL_COLOR_BUFFER_BIT);
   glDisable(GL_SCISSOR_TEST);
+}
+
+void Damage::emplace(Rectangle && r) {
+  if (container_.empty()) {
+    container_.emplace(std::move(r));
+    return;
+  }
+  auto iterator = container_.lower_bound(r);
+  if (container_.end() == iterator) {
+    --iterator;
+  }
+  if (iterator->overlaps(r)) {
+    if (iterator->contains(r)) {
+      return;
+    }
+    const bool incorporated = r.incorporate(*iterator);
+    if (incorporated) {
+      container_.erase(iterator);
+    }
+  }
+  container_.emplace(std::move(r));
+}
+
+uint32_t Damage::area() const {
+  uint32_t area = 0;
+  for (const auto & item : container_) {
+    area += item.area();
+  }
+  return area;
 }

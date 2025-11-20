@@ -15,6 +15,7 @@ public:
   Dimensions & operator = (const Dimensions &) = default;
   Dimensions & operator = (Dimensions &&) = delete;
 
+  auto area() const -> uint32_t { return surface_width_ * surface_height_; }
   auto backspace() -> void;
   auto carriage_return() -> uint16_t; 
   auto clear() -> void;
