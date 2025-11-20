@@ -18,6 +18,15 @@ struct Terminal : public Events {
   void pollin() override;
   void resize(int32_t width, int32_t height);
   void write(const char * const, const size_t);
+  void write(const std::string & s) { write(s.c_str(), s.size()); }
+
+  template <typename ... Args>
+  void escape(const char * const format, Args ... args) {
+    std::array<char, 1024> escape_sequence{'\0',};
+    const int length = snprintf(escape_sequence.data(),
+        escape_sequence.size(), format, args...);
+    write(escape_sequence.data(), length);
+  }
 
 protected:
   Terminal(Screen &);
