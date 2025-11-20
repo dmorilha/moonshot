@@ -8,10 +8,11 @@
 #include "terminal.h"
 #include "wayland.h"
 
+using namespace std::chrono_literals;
+
 template<class PAINT>
 struct WaylandPoller : public Events {
-  WaylandPoller(wayland::Connection & c, PAINT && p) : Events(POLLIN), connection_(c), paint(p) { }
-  void pollin() override;
+  WaylandPoller(wayland::Connection & c, PAINT && p) : Events(16ms), connection_(c), paint(p) { }
   void timeout() override;
 private:
   constexpr auto millis() -> uint16_t {
@@ -19,24 +20,18 @@ private:
     const uint16_t millis = (now.time_since_epoch().count() / 1000000) % 1000;
     return millis;
   }
-
   PAINT paint;
   bool alternative_ = false;
   wayland::Connection & connection_;
 };
 
 template<class PAINT>
-void WaylandPoller<PAINT>::pollin() {
+void WaylandPoller<PAINT>::timeout() {
   const bool flip = 500 <= millis();
   const bool force = alternative_ ^ flip;
   alternative_ = flip;
   paint(force, alternative_);
   connection_.roundtrip();
-}
-
-template<class PAINT>
-void WaylandPoller<PAINT>::timeout() {
-  pollin();
 }
 
 int main(int argc, char ** argv) {

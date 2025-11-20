@@ -1,6 +1,9 @@
 #include <cassert>
+#include <iostream>
 
 #include "poller.h"
+
+using namespace std::chrono_literals;
 
 void Poller::add(int fd, std::unique_ptr<Events> && events) {
   assert(static_cast<bool>(events));
@@ -16,6 +19,7 @@ void Poller::poll() {
       result = ppoll(files_.data(), files_.size(), &time_, nullptr);
       if (0 < result) {
         for (std::size_t index = 0; index < files_.size(); ++index) {
+          const auto before = std::chrono::steady_clock::now();
           if (0 != (files_[index].revents & POLLIN)) {
             events_[index]->pollin();
           }
@@ -28,10 +32,19 @@ void Poller::poll() {
           if (0 != (files_[index].revents & POLLHUP)) {
             events_[index]->pollhup();
           }
+          {
+            const auto after = std::chrono::steady_clock::now();
+            const auto difference = std::chrono::duration_cast<std::chrono::milliseconds>(after - before);
+            if (0 < difference.count()) {
+              std::cout << result << " " << difference << std::endl;
+            }
+          }
         }
       } else {
         for (std::size_t index = 0; index < files_.size(); ++index) {
-          events_[index]->timeout();
+          if (0ms < events_[index]->frequency_) {
+            events_[index]->timeout();
+          }
         }
       }
     }

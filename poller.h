@@ -11,16 +11,17 @@
 
 /* restrict constructor to unique_ptr only */
 struct Events {
+  using Frequency = std::chrono::milliseconds;
   virtual ~Events() { }
   Events(const short e) : events(e) { }
-
+  Events(const Frequency & f) : frequency_(f) { }
   virtual void pollin() { }
   virtual void pollout() { }
   virtual void pollerr() { }
   virtual void pollhup() { }
   virtual void timeout() { }
-
   const short events = 0;
+  const Frequency frequency_{0};
 };
 
 struct Poller {
