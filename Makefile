@@ -10,6 +10,10 @@ CXX_FLAGS += -DDEBUG
 CC_FLAGS += -g
 CC_FLAGS += -DDEBUG
 
+#release
+#CXX_FLAGS += -O2
+#CC_FLAGS += -O2
+
 LIBS := -lwayland-client -lwayland-egl -lwayland-cursor -lxkbcommon -lEGL -lGL
 
 CXX_FLAGS += $(shell pkgconf --cflags freetype2)
