@@ -1,5 +1,4 @@
 #include <algorithm>
-#include <iostream>
 #include <iterator>
 #include <regex>
 
@@ -82,10 +81,6 @@ void Shader::link() {
   glLinkProgram(program_);
   glValidateProgram(program_);
   
-  /*
-   * state machine that walks through the gsgl sources
-   * extracting all the associated locations.
-   **/
   enum {
     INITIAL,
     ATTRIBUTE_1,
@@ -148,7 +143,6 @@ Shader::Use Shader::use() const {
   return Use(this);
 }
 
-/* DRAW */
 Framebuffer::Draw::~Draw() {
   glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
   glBindTexture(GL_TEXTURE_2D, 0);
@@ -161,7 +155,6 @@ Framebuffer::Draw::Draw(const GLuint framebuffer, const GLuint texture) {
   glBindTexture(GL_TEXTURE_2D, texture);
 }
 
-/* READ */
 Framebuffer::Read::~Read() {
   glBindFramebuffer(GL_READ_FRAMEBUFFER, 0);
 }
@@ -234,7 +227,6 @@ Framebuffer::Read Framebuffer::read() const {
 }
 
 Texture::~Texture() {
-  std::cout << __func__ << std::endl;
   assert(0 != texture_);
   glDeleteTextures(1, &texture_);
 }
