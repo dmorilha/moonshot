@@ -35,6 +35,8 @@ void WaylandPoller<PAINT>::timeout() {
 }
 
 int main(int argc, char ** argv) {
+  setlocale(LC_CTYPE, "en_US.UTF-8");
+
   wayland::Connection connection;
   connection.connect();
   connection.capabilities();
