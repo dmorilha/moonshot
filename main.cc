@@ -35,8 +35,6 @@ void WaylandPoller<PAINT>::timeout() {
 }
 
 int main(int argc, char ** argv) {
-  using std::chrono_literals::operator""ms;
-
   wayland::Connection connection;
   connection.connect();
   connection.capabilities();
@@ -45,7 +43,7 @@ int main(int argc, char ** argv) {
 
   connection.roundtrip();
 
-  Poller poller(/* timeout for 100 fps */ 10ms);
+  Poller poller(/* timeout for ~60 fps */ 16ms);
 
   auto t = Terminal::New(screen);
   const int fd = t->childfd();

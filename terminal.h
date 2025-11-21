@@ -14,9 +14,11 @@ struct Terminal : public Events {
   static std::unique_ptr<Terminal> New(Screen &);
 
   int childfd() const;
+
   void pollhup() override;
-  void pollin() override;
-  void resize(int32_t width, int32_t height);
+  bool pollin(const std::optional<TimePoint> &) override;
+  void resize(int32_t, int32_t);
+
   void write(const char * const, const size_t);
   void write(const std::string & s) { write(s.c_str(), s.size()); }
 
@@ -41,6 +43,6 @@ protected:
     int parent = 0;
   } fd_;
   pid_t pid_ = 0;
-  std::array<char, 1025> buffer_;
+  std::array<char, 4096> buffer_;
   uint16_t bufferStart_ = 0;
 };

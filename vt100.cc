@@ -5,32 +5,12 @@
 
 #include <cassert>
 
+#include <errno.h>
+
 #include "screen.h"
 #include "vt100.h"
 
 vt100::vt100(Screen & screen) : Terminal(screen) { }
-
-void vt100::pollin() {
-  std::array<char, 1025> buffer{'\0'};
-  ssize_t length = read(fd_.child, buffer.data(), buffer.size() - 1);
-  while (0 < length) {
-    for (std::size_t i = 0; i < length; ++i) {
-      const char c = buffer[i];
-#if 0
-      if (std::isprint(c)) {
-        std::cout << c << " ";
-      } else {
-        std::cout << "* ";
-      }
-#endif
-      handleCharacter(c);
-    }
-#if 0
-    std::cout << std::endl;
-#endif
-    length = read(fd_.child, buffer.data(), buffer.size() - 1);
-  }
-}
 
 void vt100::handleDecMode(const unsigned int code, const bool mode) {
 #if 0
@@ -663,10 +643,12 @@ void vt100::handleCSI(const char c) {
         assert(!"UNIMPLEMENTED");
         break;
 
-      case 'A':
+      case 'A': {
         /* CUU - move cursor up Ps lines */
-        assert(!"UNIMPLEMENTED");
-        break;
+          const int16_t argument = std::atoi(escapeSequence_.data());
+          assert(0 < argument);
+          screen_.setCursor(screen_.getColumn(), screen_.getLine() - argument);
+        } break;
 
       case 'e':
         /* VPR - move cursor down Ps lines */
@@ -703,7 +685,7 @@ void vt100::handleCSI(const char c) {
           if (2 == size) {
             screen_.clear();
           } else if (3 == size)  {
-            int32_t argument = std::atoi(escapeSequence_.data());
+            const int32_t argument = std::atoi(escapeSequence_.data());
             switch (argument) {
             case 2:
               screen_.clear();
@@ -809,8 +791,7 @@ void vt100::handleCSI(const char c) {
       case 'n':
         /* DSR - device status report */
         {
-          int32_t argument = 1; 
-          argument = std::atoi(escapeSequence_.data());
+          const int32_t argument = std::atoi(escapeSequence_.data());
           reportDeviceStatus(argument);
         } break;
 
@@ -920,13 +901,16 @@ void vt100::handleDCS(const char) { }
 
 void vt100::handlePM(const char) { }
 
-void vt100::handleCharacter(const char c) {
+vt100::CharacterType vt100::handleCharacter(const wchar_t c) {
   switch(state_) {
   case LITERAL:
     switch (c) {
     case '\e':
       state_ = ESCAPE;
       break;
+    case '\n':
+      screen_.pushBack(runeFactory_.make(c));
+      return CharacterType::terminal;
     default:
       screen_.pushBack(runeFactory_.make(c));
       break;
@@ -1097,9 +1081,9 @@ void vt100::handleCharacter(const char c) {
       break;
     case '\\':
       /* st */
-      return;
+      return CharacterType::nonterminal;
     case '\e':
-      return;
+      return CharacterType::nonterminal;
     default:
       assert(!"INVALID ESCAPE SEQUENCE");
       state_ = LITERAL;
@@ -1122,7 +1106,6 @@ void vt100::handleCharacter(const char c) {
     assert(!"UNIMPLEMENTED");
     state_ = LITERAL;
     break;
-
   case OSC:
     handleOSC(c);
     break;
@@ -1135,7 +1118,6 @@ void vt100::handleCharacter(const char c) {
   case APC:
     handleAPC(c);
     break;
-
   case DEC:
     assert(!"UNIMPLEMENTED");
     break;
@@ -1146,6 +1128,7 @@ void vt100::handleCharacter(const char c) {
     assert(!"UNREACHABLE");
     break;
   }
+  return CharacterType::terminal;
 }
 
 void vt100::reportDeviceStatus(const int32_t argument) {
@@ -1166,4 +1149,96 @@ Color vt100::handleSGRColor(const std::vector<const char *> & codes) {
   }
   std::cout << std::endl;
   return colors::white;
+}
+
+void vt100::handleEscape(const char * const sequence, const int length) {
+  for (int i = 0; length > i; ++i) {
+    handleCharacter(sequence[i]);
+  }
+}
+
+bool vt100::pollin(const std::optional<TimePoint> & t) {
+  while (true) {
+    while (bufferIndex_ < bufferSize_) {
+      wchar_t character = 0;
+      {
+        const ssize_t size = bufferSize_ - bufferIndex_;
+#if 1
+        const ssize_t bytes = mbrtowc(&character, &buffer_[bufferIndex_], size, /* mbstate_t = */ nullptr);
+#else
+        const ssize_t bytes = 1;
+        character = static_cast<wchar_t>(buffer_[bufferIndex_]);
+#endif
+        assert(4 >= bytes);
+        if (bytes > size) {
+          std::cerr << __func__ << " " << bytes << " " << size << std::endl;
+        }
+        assert(bytes <= size);
+        switch (bytes) {
+        case -2: /* incomplete */
+          if (0 < bufferIndex_) {
+            strncpy(&buffer_[0], &buffer_[bufferIndex_], size);
+          } else {
+            /* this means there is an incomplete sequence right at the beginning of the buffer */
+            std::cerr << "also odd" << std::endl;
+          }
+          bufferStart_ = size;
+          assert(4 > bufferStart_);
+          bufferIndex_ += size;
+          assert(bufferIndex_ == bufferSize_);
+          continue;
+          break;
+
+        case -1: /* invalid */
+          std::cerr << "problems with utf-8: invalid number of bytes" << std::endl;
+          assert(!"invalid");
+          break;
+
+        case 0:
+          std::cerr << "odd" << std::endl;
+          assert(0 == character);
+          break;
+
+        default:
+          assert(0 < character);
+          bufferIndex_ += bytes;
+          const CharacterType type = handleCharacter(character);
+          /* if character type is terminal, we may return control */
+          if (CharacterType::terminal == type) {
+            if (t.has_value() && t.value() <= std::chrono::steady_clock::now()) {
+              return false;
+            }
+          }
+          break;
+        }
+      }
+    }
+
+    assert(bufferSize_ >= bufferIndex_);
+    
+    {
+      assert(4 > bufferStart_);
+      const ssize_t size = read(fd_.child, buffer_.data() + bufferStart_, buffer_.size() - bufferStart_);
+      if (0 > size) {
+        if (EAGAIN == errno) {
+          break; // nothing left to read.
+        } else if (EIO == errno) {
+          std::cerr << "A signal has not been properly caught " << errno << " " << strerror(errno) << std::endl;
+          break;
+        } else {
+          std::cerr << "errno " << errno << " " << strerror(errno) << std::endl;
+          assert(!"ERROR");
+        }
+      } else {
+        bufferSize_ = bufferStart_ + size;
+        assert(buffer_.size() >= bufferSize_);
+        if (0 == size) {
+          break; // complete read operation.
+        } else {
+          bufferStart_ = bufferIndex_ = 0;
+        }
+      }
+    }
+  }
+  return true;
 }

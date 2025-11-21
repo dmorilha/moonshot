@@ -22,13 +22,13 @@ const std::string Terminal::path = "/bin/bash";
 
 Terminal::Terminal(Screen & screen) : Events(POLLIN | POLLHUP), screen_(screen) { }
 
-void Terminal::pollin() {
+bool Terminal::pollin(const std::optional<TimePoint> &) {
   ssize_t length = 0;
   {
     const ssize_t result = read(fd_.child, buffer_.data() + bufferStart_, buffer_.size() - bufferStart_);
     if (0 > result) {
       if (EAGAIN == errno) {
-        return;
+        return true;
       } else {
         assert(!"ERROR");
       }
@@ -50,7 +50,7 @@ void Terminal::pollin() {
 #endif //DEBUG
       switch (bytes) {
       case -2: /* INCOMPLETE */
-        return;
+        return true;
         if (0 < iterator) {
           strncpy(&buffer_[0], &buffer_[iterator], size);
         }
@@ -85,6 +85,7 @@ void Terminal::pollin() {
     }
 
   }
+  return true;
 }
 
 void Terminal::pollhup() {

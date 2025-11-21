@@ -3,6 +3,7 @@
 #include <atomic>
 #include <chrono>
 #include <memory>
+#include <optional>
 #include <vector>
 
 #include <poll.h>
@@ -10,18 +11,21 @@
 #include <unistd.h>
 
 /* restrict constructor to unique_ptr only */
+using TimePoint = std::chrono::time_point<std::chrono::steady_clock>;
+
 struct Events {
-  using Frequency = std::chrono::milliseconds;
+using Frequency = std::chrono::milliseconds;
   virtual ~Events() { }
   Events(const short e) : events(e) { }
-  Events(const Frequency & f) : frequency_(f) { }
-  virtual void pollin() { }
-  virtual void pollout() { }
-  virtual void pollerr() { }
-  virtual void pollhup() { }
-  virtual void timeout() { }
+  Events(const Frequency & f) : frequency(f) { }
+  virtual auto pollerr() -> void { }
+  virtual auto pollhup() -> void { }
+  virtual auto pollin(const std::optional<TimePoint> & t) -> bool { return true; }
+  virtual auto pollout() -> void { }
+  virtual auto timeout() -> void { }
   const short events = 0;
-  const Frequency frequency_{0};
+  const Frequency frequency{0};
+  TimePoint next;
 };
 
 struct Poller {

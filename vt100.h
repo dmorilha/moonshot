@@ -27,11 +27,18 @@ struct vt100 : public Terminal {
     {47, colors::white},
   };
 
-private:
-  using EscapeSequence = std::vector<char>;
-  void pollin() override;
+  void handleEscape(const char * const, const int);
 
-  void handleCharacter(const char);
+private:
+  enum class CharacterType {
+    nonterminal,
+    terminal,
+  };
+
+  using EscapeSequence = std::vector<char>;
+  bool pollin(const std::optional<TimePoint> &) override;
+
+  CharacterType handleCharacter(const wchar_t);
 
   void handleAPC(const char);
   void handleCSI(const char);
@@ -74,4 +81,9 @@ private:
 
     UPPER_BOUND,
   } state_ = LITERAL;
+
+  uint16_t bufferIndex_ = 0;
+  uint16_t bufferSize_ = 0;
+  uint8_t bufferStart_ = 0;
 };
+
