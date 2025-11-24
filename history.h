@@ -18,16 +18,35 @@ public:
   using Iterator = Container::const_iterator;
   using ReverseIterator = Container::const_reverse_iterator;
 
-  auto erase(const uint64_t) -> uint64_t;
-  auto lines() const -> std::size_t { return lines_; }
-  auto operator [] (const uint64_t i) const { return container_.operator[](i); }
-  auto pushBack(rune::Rune &&, uint16_t cr = 0) -> uint64_t;
-  auto rbegin() const -> ReverseIterator { return container_.rbegin(); }
-  auto rend() const -> ReverseIterator { return container_.rend(); }
+  auto active(const uint32_t) const -> const rune::Rune &;
+  auto active_size() const -> uint32_t;
+  auto countLines(ReverseIterator &, const ReverseIterator &, const uint64_t limit = 0) const -> uint64_t;
+  auto lines() const -> std::size_t { return scrollback_lines_; }
+  auto print() const -> void;
+  auto pushBack(rune::Rune &&) -> void;
+  auto rbegin() const -> ReverseIterator { return scrollback_.rbegin(); }
+  auto rend() const -> ReverseIterator { return scrollback_.rend(); }
+  auto resize(const uint16_t, const uint16_t) -> void;
   auto reverseIterator(const uint64_t) -> ReverseIterator;
-  auto size() const -> uint64_t { return container_.size(); }
+  auto scrollback_size() const -> uint64_t { return scrollback_.size(); }
+  auto setCursor(const uint16_t, const uint16_t) -> void;
+  auto size() const -> uint64_t { return scrollback_size() + active_size(); }
 
 private:
-  Container container_;
-  uint64_t lines_ = 0;
+  auto column() const -> uint16_t {
+    assert(0 < columns_);
+    assert(0 == start_ % columns_);
+    return index_ % columns_;
+  }
+
+  auto line() const -> uint16_t;
+
+  Container active_; // circular buffer representing the screen
+  Container scrollback_; // scrollback buffer
+  uint32_t index_ = 0; // current index into the displayed lines buffer.
+  uint32_t start_ = 0; // a multiple of columns representing column 1, line 1.
+  uint64_t columns_ = 0;
+  uint64_t scrollback_lines_ = 0;
+
+  bool carriage_return_ = false;
 };

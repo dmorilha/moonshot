@@ -30,7 +30,7 @@ struct Rune {
   Blink blink = Blink::STEADY;
   bool crossout = false;
   bool underline = false;
-  wchar_t character;
+  wchar_t character = L'\0';
 
   Rune() = default;
   Rune(const wchar_t c) : character(c) { }
@@ -51,6 +51,7 @@ struct Rune {
   bool operator == (const char c) const { return character == c; }
   bool operator < (const Rune &) const; 
   operator std::string() const;
+  operator bool () const { return L'\0' != character; }
 
   friend RuneFactory;
   friend std::ostream & operator << (std::ostream &, const Rune &);

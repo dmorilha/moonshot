@@ -36,7 +36,7 @@ private:
     opengl::Framebuffer framebuffer;
     opengl::Framebuffer alternative;
     Rectangle_Y area;
-    uint64_t buffer_index = 0;
+    uint64_t index = 0;
   };
 
   using Container = std::list<Entry>;
@@ -65,7 +65,7 @@ public:
   auto reset(const uint16_t, const uint16_t) -> void;
 
   auto has_alternative() const -> bool;
-  auto first_buffer_index() const -> uint64_t { return container_.empty() ? 0 : container_.front().buffer_index; }
+  auto first_index() const -> uint64_t { return container_.empty() ? 0 : container_.front().index; }
   auto first_y() const -> uint64_t { return container_.empty() ? 0 : container_.front().area.y; }
   auto total_height() const -> uint32_t;
 
@@ -127,11 +127,11 @@ struct Screen {
   auto setPosition(const uint16_t, const uint16_t) -> void;
   auto setTitle(const std::string &) -> void;
   auto startSelection(const uint16_t, const uint16_t) -> void;
+  auto shouldRepaint() -> bool { return FULL == repaint_; }
 
   std::function<void (int32_t, int32_t)> onResize;
 
 private:
-
   Screen(std::unique_ptr<wayland::Surface> &&);
 
   auto countLines(History::ReverseIterator &, const History::ReverseIterator &, const uint64_t limit = 0) const -> uint64_t;
@@ -140,7 +140,8 @@ private:
   auto history() -> History & { return history_; }
   auto makeCurrent() const -> void { surface_->egl().makeCurrent(); }
   auto overflow() -> int32_t;
-  auto recreateFromBuffer(const uint64_t index) -> void;
+  auto recreateFromActiveHistory() -> void;
+  auto recreateFromScrollback(const uint64_t index) -> void;
   auto renderCharacter(const Rectangle &, const rune::Rune &) -> void;
   auto select(const Rectangle & rectangle) -> void;
   auto swapBuffers(bool fullSwap = true) -> void;
