@@ -514,7 +514,7 @@ void Connection::registryGlobal(struct wl_registry * const registry,
 
 void Connection::seatCapabilities(struct wl_seat * const seat, const uint32_t capabilities) {
   assert(nullptr != seat);
-  if (0 != WL_SEAT_CAPABILITY_POINTER & capabilities) {
+  if (0 != (WL_SEAT_CAPABILITY_POINTER & capabilities)) {
     assert(nullptr == pointer_);
     pointer_ = wl_seat_get_pointer(seat);
     wl_pointer_add_listener(pointer_, &PointerListener, this);
@@ -524,7 +524,7 @@ void Connection::seatCapabilities(struct wl_seat * const seat, const uint32_t ca
     }
 
   }
-  if (0 != WL_SEAT_CAPABILITY_KEYBOARD & capabilities) {
+  if (0 != (WL_SEAT_CAPABILITY_KEYBOARD & capabilities)) {
     assert(nullptr == keyboard_);
     keyboard_ = wl_seat_get_keyboard(seat);
     wl_keyboard_add_listener(keyboard_, &KeyboardListener, this);

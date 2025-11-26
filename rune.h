@@ -48,7 +48,7 @@ struct Rune {
   bool isuppercase() const { return std::isupper(character, locale_); }
 
   const Rune & operator = (const char c) { character = c; return *this; }
-  bool operator == (const char c) const { return character == c; }
+  bool operator == (const wchar_t c) const { return character == c; }
   bool operator < (const Rune &) const; 
   operator std::string() const;
   operator bool () const { return L'\0' != character; }

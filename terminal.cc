@@ -97,6 +97,7 @@ int Terminal::childfd() const {
 }
 
 std::unique_ptr<Terminal> Terminal::New(Screen & screen) {
+  static char * arguments[] = { nullptr, };
   std::unique_ptr<Terminal> instance = nullptr;
 
   const char * const TERM = getenv("TERM");
@@ -136,7 +137,7 @@ std::unique_ptr<Terminal> Terminal::New(Screen & screen) {
     login_tty(instance->fd_.parent);
     unsetenv("COLORTERM");
     unsetenv("TERMCAP");
-    const int returnValue = execvp(Terminal::path.c_str(), nullptr);
+    const int returnValue = execvp(Terminal::path.c_str(), arguments);
     if (0 != returnValue) {
       assert(!"FATAL ERROR");
     }
