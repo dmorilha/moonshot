@@ -1,5 +1,7 @@
 *.d
 *.o
 *.sw?
+flamegraph.html
+gecko_profile.json
 main*
 perf.data*
