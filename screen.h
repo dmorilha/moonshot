@@ -61,12 +61,12 @@ public:
   auto emplace_front(const int32_t) -> Entry &;
   auto is_current(Entry & entry) const -> bool { return current_->framebuffer == entry.framebuffer; }
   auto paint(const uint16_t frame = 0) -> bool;
-  auto repaint(const Rectangle, const uint64_t, const bool alternative = false) -> void;
+  auto repaint(const Rectangle, const int64_t, const bool alternative = false) -> void;
   auto reset(const uint16_t, const uint16_t) -> void;
 
   auto has_alternative() const -> bool;
-  auto first_index() const -> uint64_t { return container_.empty() ? 0 : container_.front().index; }
-  auto first_y() const -> uint64_t { return container_.empty() ? 0 : container_.front().area.y; }
+  auto front_index() const -> uint64_t { return container_.empty() ? 0 : container_.front().index; }
+  auto front_y() const -> int64_t { return container_.empty() ? 0 : container_.front().area.y; }
   auto total_height() const -> uint32_t;
 
   constexpr auto height() const { return height_; }

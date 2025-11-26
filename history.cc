@@ -2,10 +2,13 @@
 
 #include "history.h"
 
-void History::pushBack(rune::Rune && rune) {
+void History::emplace(rune::Rune && rune) {
   bool newLine = false;
   if (rune.iscontrol()) {
     switch (rune.character) {
+    case L'\0': // null
+      assert(!"UNRECHEABLE");
+      return;
     case L'\b': // backspace
       --index_;
       return;
@@ -22,31 +25,34 @@ void History::pushBack(rune::Rune && rune) {
       return;
     }
   }
-
+  if ( ! static_cast<bool>(active_[index_])) {
+    ++active_size_;
+  }
+  active_[index_] = rune;
   if (newLine) {
-    active_[index_] = L'\n';
     index_ += columns_ - (index_ % columns_);
   } else {
     if (carriage_return_) {
       const int16_t columns = index_ % columns_;
       index_ -= columns;
     }
-    active_[index_] = std::move(rune);
     index_ = (index_ + 1) % active_.size();
   }
   index_ %= active_.size();
   carriage_return_ = false;
   if (index_ == start_) {
-    for (int i = 0; i < columns_; ++i) {
+    for (uint32_t i = 0; i < columns_; ++i) {
       rune::Rune & rune = active_[start_ + i];
       if (rune) {
         scrollback_.push_back(rune);
         rune = rune::Rune();
+        --active_size_;
       }
     }
     start_ = (start_ + columns_) % active_.size();
     scrollback_lines_ += 1;
   }
+  assert(0 < active_size_);
   return;
 }
 
@@ -60,7 +66,7 @@ History::ReverseIterator History::reverseIterator(const uint64_t i) {
 void History::resize(const uint16_t columns, const uint16_t lines) {
   assert(0 < columns);
   assert(0 < lines);
-#if DEBUG
+#if not NDEBUG
   const uint64_t sizeBefore = size();
 #endif
   const uint16_t oldColumns = columns_;
@@ -69,18 +75,16 @@ void History::resize(const uint16_t columns, const uint16_t lines) {
   Container active(columns * lines);
   std::swap(active_, active);
   columns_ = columns;
-  index_ = start_ = 0;
+  active_size_ = index_ = start_ = 0;
   carriage_return_ = false;
   if (0 == oldColumns) {
     return;
   }
-#if DEBUG
   assert(0 < sizeBefore);
-#endif
   while (end != index) {
     assert(static_cast<bool>(active[index]));
     const bool newLine = L'\n' == active[index];
-    pushBack(std::move(active[index]));
+    emplace(std::move(active[index]));
     if (newLine) {
       index = index - (index % oldColumns) + oldColumns;
     } else {
@@ -88,9 +92,7 @@ void History::resize(const uint16_t columns, const uint16_t lines) {
     }
     index %= active.size();
   }
-#if DEBUG
   assert(sizeBefore == size());
-#endif
 }
 
 uint64_t History::countLines(History::ReverseIterator & iterator, const History::ReverseIterator & end, const uint64_t limit) const {
@@ -150,11 +152,6 @@ uint16_t History::line() const {
   return index_ / columns_ + bottom /* if any */ ;
 }
 
-uint32_t History::active_size() const {
-  return std::count_if(active_.begin(), active_.end(),
-      [](const rune::Rune & rune){ return static_cast<bool>(rune); });
-}
-
 void History::print() const {
   std::cout << __FILE__ << ":" << __LINE__ << " " << __func__ << std::endl;
   uint32_t i = start_;
@@ -177,4 +174,23 @@ void History::print() const {
 const rune::Rune & History::active(const uint32_t i) const {
   assert(active_.size() > i);
   return active_[(start_ + i) % active_.size()];
+}
+
+void History::clear() {
+  assert(0 < columns_);
+  assert(0 == start_ % columns_);
+#if not NDEBUG
+  const uint64_t sizeBefore = size();
+#endif
+  const uint32_t end = index_ - (index_ % columns_);
+  for (; end != start_; start_ = (start_ + 1) % active_.size()) {
+    rune::Rune & rune = active_[start_];
+    if (rune) {
+      scrollback_.push_back(rune);
+      rune = rune::Rune();
+      --active_size_;
+    }
+  }
+  assert(0 == start_ % columns_);
+  assert(sizeBefore == size());
 }

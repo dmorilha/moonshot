@@ -140,16 +140,21 @@ Screen::Screen(Screen && other) : surface_(std::move(other.surface_)) { }
 
 void Screen::changeScrollY(int32_t value) {
   value *= -2;
-  // prevents unsigned from overflowing
-  if ((0 < value || dimensions_.scroll_y() >= -1 * value)
-    && dimensions_.lines() < history_.lines()) {
-    const uint64_t difference = pages_.total_height()
-      - dimensions_.line_to_pixel(dimensions_.displayed_lines())
-      - dimensions_.remainder();
-    if (difference >= dimensions_.scroll_y()) {
-      dimensions_.scroll_y(std::min(difference, value + dimensions_.scroll_y()));
-      repaint_ = FULL;
-   }
+  const uint64_t new_value = dimensions_.scroll_y() + value;
+  if (0 < value) /* if we are scrolling up */  {
+    if (new_value + dimensions_.surface_height() >= pages_.total_height()) {
+      const uint64_t index = pages_.front_index();
+      if (1 < index) {
+        recreateFromScrollback(index - 1);
+      }
+    }
+  }
+  if (0 < value || dimensions_.scroll_y() > value * -1) {
+    dimensions_.scroll_y(new_value);
+    repaint_ = FULL;
+  } else if (0 < dimensions_.scroll_y()) {
+    dimensions_.scroll_y(0);
+    repaint_ = FULL;
   }
 }
 
@@ -229,15 +234,14 @@ void Screen::pushBack(rune::Rune && rune) {
     dimensions_.cursor_column(1);
   }
 
-  if (FULL != repaint_ &&
-      0 < dimensions_.scroll_y()) {
+  if (FULL != repaint_ && 0 < dimensions_.scroll_y()) {
     resetScroll();
     repaint_ = FULL;
   } else if (NO == repaint_) {
     repaint_ = PARTIAL;
   }
 
-  history_.pushBack(std::move(rune));
+  history_.emplace(std::move(rune));
 
   assert(0 < dimensions_.glyph_width());
   uint16_t columns = 1;
@@ -259,7 +263,7 @@ void Screen::pushBack(rune::Rune && rune) {
     break;
 
   case L'\r': // carriage return
-    dimensions_.set_carriage_return();
+    dimensions_.cursor_column(1);
     return;
 
   case L'\n': // new line
@@ -311,31 +315,18 @@ void Screen::repaint(const bool force, const bool alternative) {
     opengl::clear(dimensions_.surface_width(), dimensions_.surface_height(), colors::black);
 #if 1
     int32_t height = static_cast<int32_t>(dimensions_.line_to_pixel(dimensions_.displayed_lines() + 1));
-    uint64_t offset_y = 0;
+    int64_t offset_y = 0;
     if (0 < dimensions_.scrollback_lines()) {
       offset_y = dimensions_.scrollback_lines() * dimensions_.line_height();
-
-      if (0 < dimensions_.scroll_y()) {
-        if (offset_y > dimensions_.scroll_y()) {
-          offset_y -= dimensions_.scroll_y();
-        } else  {
-          offset_y = 0;
-        }
-
-        height = dimensions_.surface_height();
-
-        if (0 < pages_.first_y() &&
-            pages_.first_y() + 2 * dimensions_.surface_height() > offset_y) {
-            const uint64_t index = pages_.first_index();
-            if (1 < index) {
-              recreateFromScrollback(index - 1);
-            }
-        }
-      } else if (dimensions_.overflow()) {
-        offset_y -= dimensions_.remainder();
-      }
-
     }
+
+    if (0 != dimensions_.scroll_y()) {
+      offset_y -= dimensions_.scroll_y();
+      height = dimensions_.surface_height();
+    } else if (dimensions_.overflow()) {
+      offset_y -= dimensions_.remainder();
+    }
+
     pages_.repaint(
       Rectangle{
         .x = 0,
@@ -492,7 +483,7 @@ Pages::Entry & Pages::update(Rectangle_Y & rectangle, const uint64_t index) {
   return *current_;
 }
 
-void Pages::repaint(const Rectangle rectangle, const uint64_t offset_y, const bool alt) {
+void Pages::repaint(const Rectangle rectangle, const int64_t offset_y, const bool alt) {
   assert(0 == rectangle.x);
   assert(width_ >= rectangle.width);
   const auto END = container_.end();
@@ -504,6 +495,7 @@ void Pages::repaint(const Rectangle rectangle, const uint64_t offset_y, const bo
       break;
     }
   }
+
   if (0 == height) {
     return;
   } else if (height_ < height) {
@@ -569,8 +561,8 @@ void Pages::repaint(const Rectangle rectangle, const uint64_t offset_y, const bo
     }
   }
 
-  const uint64_t a = offset_y + y;
-  const uint64_t b = offset_y + height;
+  const int64_t a = offset_y + y;
+  const int64_t b = offset_y + height;
   for (auto iterator = container_.begin(); END != iterator; ++iterator) {
     if (a < iterator->area.y + iterator->area.height && b > iterator->area.y) {
       // from
@@ -704,6 +696,7 @@ void Screen::EL() {
 
 void Screen::clear() {
   dimensions_.clear();
+  history_.clear();
   repaint_ = FULL;
 }
 
@@ -863,11 +856,10 @@ Pages::Entry & Pages::emplace_front(const int32_t height) {
   assert(0 < height);
   assert(0 < height_);
   assert(height <= height_);
-  uint64_t y = 0;
+  int64_t y = 0;
   if (!container_.empty()) {
     const Entry & front = container_.front();
-    y = Pages::first_y() - height;
-    assert(0 <= y);
+    y = Pages::front_y() - height;
   }
 
   const Rectangle_Y rectangle{
@@ -889,7 +881,7 @@ Pages::Entry & Pages::emplace_front(const int32_t height) {
 Pages::Entry Pages::entry(const Rectangle_Y & rectangle, const uint64_t index) {
   assert(0 < width_);
   assert(0 < height_);
-#if 1
+#if 0
   const Color color{
     .red = static_cast<float>(drand48()),
     .green = static_cast<float>(drand48()),

@@ -17,7 +17,6 @@ public:
 
   auto area() const -> uint32_t { return surface_width_ * surface_height_; }
   auto backspace() -> void;
-  auto carriage_return() -> uint16_t; 
   auto clear() -> void;
   auto cursor_column() const { return cursor_column_; }
   auto cursor_column(const uint16_t) -> void;
@@ -36,7 +35,6 @@ public:
   auto scroll_y() const { return scroll_y_; }
   auto scroll_y(const auto v) { scroll_y_ = v; }
   auto scrollback_lines() const { return scrollback_lines_; }
-  auto set_carriage_return() -> void; 
   auto set_cursor(const uint16_t, const uint16_t) -> void;
   auto surface_height() const { return surface_height_; }
   auto surface_width() const { return surface_width_; }
@@ -109,7 +107,6 @@ private:
   // the next character will be displayed at
   uint16_t cursor_column_ = 1; // 65k, it goes 1 up to a ... ~thousand
   uint16_t cursor_line_ = 1; // 65k, it goes 1 up to a ... ~thousand
-  uint16_t carriage_return_ = 0; // how many characters have been returned
 
   uint16_t surface_height_ = 0; // pixels
   uint16_t surface_width_ = 0; // pixels

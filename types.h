@@ -60,7 +60,7 @@ struct Rectangle {
 
 struct Rectangle_Y {
   int32_t x = 0;
-  uint64_t y = 0;
+  int64_t y = 0;
   int32_t width = 0;
   int32_t height = 0;;
 

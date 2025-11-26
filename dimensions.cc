@@ -31,7 +31,6 @@ void Dimensions::clear() {
 }
 
 bool Dimensions::new_line() {
-  carriage_return_ = 0;
   const bool add_scrollback_line = lines() <= displayed_lines_;
   if (add_scrollback_line) {
     overflow_ = 0 < remainder();
@@ -66,7 +65,7 @@ Dimensions::operator Rectangle_Y () const {
 
   return {
     .x = column_to_pixel(cursor_column_),
-    .y = line_to_pixel(scrollback_lines_ + cursor_line_),
+    .y = static_cast<int64_t>(line_to_pixel(scrollback_lines_ + cursor_line_)),
     .width = glyph_width_,
     .height = line_height_,
   };
@@ -116,15 +115,4 @@ void Dimensions::reset(freetype::Face & face, const uint16_t width, const uint16
   cursor_column_ = cursor_line_ = displayed_lines_ = 1;
   overflow_ = wrap_next_ = false;
   scroll_y_ = scrollback_lines_ = 0;
-}
-
-void Dimensions::set_carriage_return() {
-  if (carriage_return_ < cursor_column_) {
-    carriage_return_ = cursor_column_;
-  }
-  cursor_column_ = 1;
-}
-
-uint16_t Dimensions::carriage_return() {
-  return carriage_return_ > cursor_column_ ? carriage_return_ - cursor_column_ : 0;
 }
