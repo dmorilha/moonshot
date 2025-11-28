@@ -612,7 +612,7 @@ void vt100::handleCSI(const char c) {
 
       case 'K':
         /* EL - clear(erase) line right of cursor */
-        screen_.EL();
+        screen_.erase_line_right();
         break;
 
       case '@':
@@ -620,7 +620,10 @@ void vt100::handleCSI(const char c) {
          * The cursor remains at the beginning of the blank characters.
          * Text between the cursor and right margin moves to the right.
          */
-        assert(!"UNIMPLEMENTED");
+        {
+          const int argument = std::atoi(escapeSequence_.data());
+          screen_.insert(argument);
+        }
         break;
 
       case 'a':
@@ -628,9 +631,36 @@ void vt100::handleCSI(const char c) {
         assert(!"UNIMPLEMENTED");
         break;
 
+      case 'A':
+        /* CUU - move cursor up Ps lines */
+        {
+          const int argument = std::atoi(escapeSequence_.data());
+          screen_.move_cursor_up(0 < argument ? argument : 1);
+        }
+        break;
+
+      case 'B':
+        /* CUD - move cursor down Ps lines */
+        {
+          const int argument = std::atoi(escapeSequence_.data());
+          screen_.move_cursor_down(0 < argument ? argument : 1);
+        }
+        break;
+
       case 'C':
         /* CUF - move cursor right (forward) Ps lines */
-        assert(!"UNIMPLEMENTED");
+        {
+          const int argument = std::atoi(escapeSequence_.data());
+          screen_.move_cursor_forward(0 < argument ? argument : 1);
+        }
+        break;
+
+      case 'D':
+        /* CUB - move cursor left (back) Ps lines */
+        {
+          const int argument = std::atoi(escapeSequence_.data());
+          screen_.move_cursor_backward(0 < argument ? argument : 1);
+        }
         break;
 
       case 'L':
@@ -638,25 +668,8 @@ void vt100::handleCSI(const char c) {
         assert(!"UNIMPLEMENTED");
         break;
 
-      case 'D':
-        /* CUB - move cursor left (back) Ps lines */
-        assert(!"UNIMPLEMENTED");
-        break;
-
-      case 'A': {
-        /* CUU - move cursor up Ps lines */
-          const int16_t argument = std::atoi(escapeSequence_.data());
-          assert(0 < argument);
-          screen_.setCursor(screen_.getColumn(), screen_.getLine() - argument);
-        } break;
-
       case 'e':
         /* VPR - move cursor down Ps lines */
-        assert(!"UNIMPLEMENTED");
-        break;
-
-      case 'B':
-        /* CUD - move cursor down Ps lines */
         assert(!"UNIMPLEMENTED");
         break;
 
@@ -791,7 +804,7 @@ void vt100::handleCSI(const char c) {
       case 'n':
         /* DSR - device status report */
         {
-          const int32_t argument = std::atoi(escapeSequence_.data());
+          const int argument = std::atoi(escapeSequence_.data());
           reportDeviceStatus(argument);
         } break;
 
@@ -812,7 +825,10 @@ void vt100::handleCSI(const char c) {
 
       case 'P':
         /* DCH - erase Ps characters */
-        assert(!"UNIMPLEMENTED");
+        {
+          const int argument = std::atoi(escapeSequence_.data());
+          screen_.erase(argument);
+        }
         break;
 
       case 'i':
@@ -941,6 +957,7 @@ vt100::CharacterType vt100::handleCharacter(const wchar_t c) {
     break;
 
   case ESCAPE:
+    std::cerr << "Escape sequence " << static_cast<char>(c) << std::endl;
     switch (c) {
     case '[':
       state_ = CSI;
@@ -956,21 +973,26 @@ vt100::CharacterType vt100::handleCharacter(const wchar_t c) {
       break;
     case 'M':
       /* reverse line feed */
+      assert(!"UNIMPLEMENTED");
       state_ = LITERAL;
       break;
     case 'E':
       /* new line */
+      assert(!"UNIMPLEMENTED");
       state_ = LITERAL;
       break;
     case 'D':
       /* line feed */
+      assert(!"UNIMPLEMENTED");
       state_ = LITERAL;
       break;
     case '#':
+      assert(!"UNIMPLEMENTED");
       state_ = DEC;
       break;
     case 'H':
       /* set tab stop at current column */
+      assert(!"UNIMPLEMENTED");
       state_ = LITERAL;
       break;
     case '(':
@@ -993,97 +1015,122 @@ vt100::CharacterType vt100::handleCharacter(const wchar_t c) {
       break;
     case 'g':
       /* bell */
+      assert(!"UNIMPLEMENTED");
       state_ = LITERAL;
       break;
     case '=':
       /* application keypad */
+      assert(!"UNIMPLEMENTED");
       state_ = LITERAL;
       break;
     case '>':
       /* normal keypad */
+      assert(!"UNIMPLEMENTED");
       state_ = LITERAL;
       break;
     case '`':
       /* disable manual input */
+      assert(!"UNIMPLEMENTED");
       state_ = LITERAL;
       break;
     case 'b':
       /* enable manual input */
+      assert(!"UNIMPLEMENTED");
       state_ = LITERAL;
       break;
     case 'c':
       /* reset initial state */
+      assert(!"UNIMPLEMENTED");
       state_ = LITERAL;
       break;
     case '7':
       /* save cursor */
+      assert(!"UNIMPLEMENTED");
       state_ = LITERAL;
       break;
     case '8':
       /* restore cursor */
+      assert(!"UNIMPLEMENTED");
       state_ = LITERAL;
       break;
     case '6':
       /* DECBI */
+      assert(!"UNIMPLEMENTED");
       state_ = LITERAL;
       break;
     case '9':
       /* DECFI */
+      assert(!"UNIMPLEMENTED");
       state_ = LITERAL;
       break;
     case 'd':
       /* coding method delimiter */
+      assert(!"UNIMPLEMENTED");
       state_ = LITERAL;
       break;
     case 'n':
       /* invoke the g2 charset into gl */
+      assert(!"UNIMPLEMENTED");
       state_ = LITERAL;
       break;
     case 'o':
       /* invoke the g2 charset into gl */
+      assert(!"UNIMPLEMENTED");
       state_ = LITERAL;
       break;
     case '|':
       /* invoke the g3 charset into gl */
+      assert(!"UNIMPLEMENTED");
       state_ = LITERAL;
       break;
     case '}':
       /* invoke the g2 charset into gl */
+      assert(!"UNIMPLEMENTED");
       state_ = LITERAL;
       break;
     case '~':
       /* invoke the g1 charset into gl */
+      assert(!"UNIMPLEMENTED");
       state_ = LITERAL;
       break;
     case 'N':
       /* single shift select of g2 character set */
+      assert(!"UNIMPLEMENTED");
       state_ = LITERAL;
       break;
     case 'O':
       /* single shift select of g3 character set */
+      assert(!"UNIMPLEMENTED");
       state_ = LITERAL;
       break;
     case 'k':
       /* old tabtitle set sequence */
+      assert(!"UNIMPLEMENTED");
       state_ = LITERAL;
       break;
     case 'X':
       /* start of string */
+      assert(!"UNIMPLEMENTED");
       state_ = LITERAL;
       break;
     case 'V':
       /* start of guarded area */
+      assert(!"UNIMPLEMENTED");
       state_ = LITERAL;
       break;
     case 'W':
       /* end of guarded area */
+      assert(!"UNIMPLEMENTED");
       state_ = LITERAL;
       break;
+
     case '\\':
       /* st */
       return CharacterType::nonterminal;
+
     case '\e':
       return CharacterType::nonterminal;
+
     default:
       assert(!"INVALID ESCAPE SEQUENCE");
       state_ = LITERAL;

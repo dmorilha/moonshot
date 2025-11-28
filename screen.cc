@@ -240,13 +240,19 @@ void Screen::pushBack(rune::Rune && rune) {
   } else if (NO == repaint_) {
     repaint_ = PARTIAL;
   }
-
+  pushCharacter(rune);
   history_.emplace(std::move(rune));
+}
 
+void Screen::pushCharacter(rune::Rune rune) {
   assert(0 < dimensions_.glyph_width());
   uint16_t columns = 1;
   uint16_t width = dimensions_.glyph_width();
   switch (rune.character) {
+  case L'\0':
+    rune.character = L' ';
+    break;
+
   case L'\a':
     // assert( ! "UNREACHABLE");
     return;
@@ -667,6 +673,7 @@ bool Pages::paint(const uint16_t frame) {
 }
 
 void Screen::backspace() {
+  assert(!"UNRECHEABLE");
   const auto drawer = pages_.draw(static_cast<Rectangle_Y>(dimensions_), 0);
   drawer.clear(colors::black);
 #if 0
@@ -679,7 +686,8 @@ void Screen::backspace() {
   repaint_ = PARTIAL;
 }
 
-void Screen::EL() {
+void Screen::erase_line_right() {
+  history_.erase_line_right();
   Rectangle_Y rectangle(dimensions_);
   rectangle.width = dimensions_.surface_width() - rectangle.x;
   const auto drawer = pages_.draw(rectangle, 0);
@@ -692,6 +700,76 @@ void Screen::EL() {
     .height = drawer.target.height,});
 #endif
   repaint_ = PARTIAL;
+}
+
+void Screen::erase(const int n) {
+  assert(0 < n);
+  int32_t width = 0;
+  history_.erase(n);
+  const uint16_t column = dimensions_.cursor_column(),
+        end = dimensions_.columns(),
+        difference = end - column;
+  for (int i = 0; difference >= i; ++i) {
+    const rune::Rune & rune = history_.next(i);
+    pushCharacter(rune);
+  }
+  dimensions_.cursor_column(column);
+  repaint_ = PARTIAL;
+}
+
+void Screen::insert(const int n) {
+  assert(0 < n);
+  int32_t width = 0;
+  history_.insert(n);
+  const uint16_t column = dimensions_.cursor_column(),
+        end = dimensions_.columns(),
+        difference = end - column;
+  for (int i = 0; difference >= i; ++i) {
+    const rune::Rune & rune = history_.next(i);
+    pushCharacter(rune);
+  }
+  dimensions_.cursor_column(column);
+  repaint_ = PARTIAL;
+}
+
+void Screen::move_cursor_forward(const int n) {
+  const uint16_t column = dimensions_.cursor_column() + n;
+  if (dimensions_.columns() >= column) {
+    history_.move_cursor_forward(n);
+    dimensions_.cursor_column(column);
+  } else {
+    assert(!"UNRECHEABLE");
+  }
+}
+
+void Screen::move_cursor_backward(const int n) {
+  const uint16_t column = dimensions_.cursor_column() - n;
+  if (0 < column) {
+    history_.move_cursor_backward(n);
+    dimensions_.cursor_column(column);
+  } else {
+    assert(!"UNRECHEABLE");
+  }
+}
+
+void Screen::move_cursor_down(const int n) {
+  const uint16_t line = dimensions_.cursor_line() + n;
+  if (dimensions_.lines() >= line) {
+    history_.move_cursor_down(n);
+    dimensions_.cursor_line(line);
+  } else {
+    assert(!"UNRECHEABLE");
+  }
+}
+
+void Screen::move_cursor_up(const int n) {
+  const uint16_t line = dimensions_.cursor_line() - n;
+  if (0 < line) {
+    history_.move_cursor_up(n);
+    dimensions_.cursor_line(line);
+  } else {
+    assert(!"UNRECHEABLE");
+  }
 }
 
 void Screen::clear() {
@@ -798,7 +876,7 @@ void Screen::recreateFromActiveHistory() {
   int16_t columns = 1, cursor_column = 1, lines = 1;
   for (uint32_t i = 0; size > i; ++i) {
     target.width = dimensions_.glyph_width();
-    rune::Rune rune = history_.active(i);
+    rune::Rune rune = history_.at(i);
     if (rune.iscontrol()) {
       switch (rune.character) {
       case L'\0':

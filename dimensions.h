@@ -21,6 +21,7 @@ public:
   auto cursor_column() const { return cursor_column_; }
   auto cursor_column(const uint16_t) -> void;
   auto cursor_line() const { return cursor_line_; }
+  auto cursor_line(const uint16_t) -> void;
   auto displayed_lines() const { return displayed_lines_; }
   auto displayed_lines(const uint16_t v) -> void;
   auto glyph_descender() const { return glyph_descender_; }

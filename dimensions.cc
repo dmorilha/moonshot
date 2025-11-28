@@ -98,6 +98,12 @@ void Dimensions::cursor_column(const uint16_t v) {
   cursor_column_ = v;
 }
 
+void Dimensions::cursor_line(const uint16_t v) {
+  assert(0 < v);
+  assert(lines() >= v);
+  cursor_line_ = v;
+}
+
 void Dimensions::reset(freetype::Face & face, const uint16_t width, const uint16_t height) {
   assert(0 < width);
   assert(0 < height);

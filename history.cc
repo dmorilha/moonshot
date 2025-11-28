@@ -9,8 +9,11 @@ void History::emplace(rune::Rune && rune) {
     case L'\0': // null
       assert(!"UNRECHEABLE");
       return;
+    case L'\a': // bell
+      return;
     case L'\b': // backspace
       --index_;
+      ++returned_;
       return;
     case L'\n': // new line
       newLine = true;
@@ -25,18 +28,24 @@ void History::emplace(rune::Rune && rune) {
       return;
     }
   }
+  if (carriage_return_ && ! newLine) {
+    const uint32_t value = index_ % columns_;
+    index_ -= value;
+    returned_ += value;
+  }
   if ( ! static_cast<bool>(active_[index_])) {
     ++active_size_;
   }
   active_[index_] = rune;
   if (newLine) {
-    index_ += columns_ - (index_ % columns_);
+    const uint32_t value = columns_ - (index_ % columns_);
+    index_ += value;
+    returned_ = 0;
   } else {
-    if (carriage_return_) {
-      const int16_t columns = index_ % columns_;
-      index_ -= columns;
+    ++index_;
+    if (0 < returned_) {
+      --returned_;
     }
-    index_ = (index_ + 1) % active_.size();
   }
   index_ %= active_.size();
   carriage_return_ = false;
@@ -92,7 +101,13 @@ void History::resize(const uint16_t columns, const uint16_t lines) {
     }
     index %= active.size();
   }
-  assert(sizeBefore == size());
+#if not NDEBUG
+  if (size() != sizeBefore) {
+    std::cerr << "size " << size() << " is different than size before " << sizeBefore << std::endl
+      << active_size_ << " " << check_active_size() << std::endl;
+  }
+  assert(size() == sizeBefore);
+#endif
 }
 
 uint64_t History::countLines(History::ReverseIterator & iterator, const History::ReverseIterator & end, const uint64_t limit) const {
@@ -171,9 +186,14 @@ void History::print() const {
   }
 }
 
-const rune::Rune & History::active(const uint32_t i) const {
+const rune::Rune & History::at(const uint32_t i) const {
   assert(active_.size() > i);
   return active_[(start_ + i) % active_.size()];
+}
+
+const rune::Rune & History::next(const uint32_t i) const {
+  assert(active_.size() > i);
+  return active_[(index_ + i) % active_.size()];
 }
 
 void History::clear() {
@@ -193,4 +213,87 @@ void History::clear() {
   }
   assert(0 == start_ % columns_);
   assert(sizeBefore == size());
+}
+
+void History::erase_line_right() {
+  assert(0 < columns_);
+  // dassert(0 < returned_);
+  const uint32_t end = index_ - (index_ % columns_) + columns_;
+  for (uint32_t index = index_; end > index; ++index) {
+    rune::Rune & rune = active_[index];
+    if (rune) {
+      rune = rune::Rune();
+      --active_size_;
+    }
+  }
+  returned_ = 0;
+}
+
+void History::erase(const int n) {
+  assert(0 < columns_);
+  assert(0 < n);
+  assert(n <= returned_);
+  const uint32_t dst = index_,
+    end = index_ - (index_ % columns_) + columns_,
+    src = index_ + n;
+
+  // copies everything from index_ + n to end of line, back to index_,
+  // then fill remaining n characters with Rune()
+  std::fill(
+      std::copy(/* index_ + n */ active_.data() + src,
+        /* next line */ active_.data() + end,
+        /* index_ */ active_.data() + dst),
+      active_.data() + end, rune::Rune());
+
+  returned_ -= n;
+}
+
+void History::insert(const int n) {
+  assert(0 < columns_);
+  assert(0 < n);
+  assert(n <= columns_ - (index_ % columns_));
+  const uint32_t dst = index_ - (index_ % columns_) + columns_,
+    end = dst - n,
+    src = index_;
+  std::copy_backward(active_.data() + src, active_.data() + end, active_.data() + dst); 
+  for (uint32_t index = index_; index_ + n > index; ++index) {
+    assert(static_cast<bool>(active_[index].character));
+    active_[index].character = L' ';
+  }
+
+  returned_ += n;
+}
+
+uint32_t History::check_active_size() const {
+  return std::count_if(active_.begin(), active_.end(), [](const rune::Rune & r) { return static_cast<bool>(r); });
+}
+
+void History::move_cursor_backward(const int n) {
+  assert(0 < n);
+  assert(n < columns_);
+  assert(index_ - (index_ % columns_) <= index_ - n);
+  index_ -= n;
+  returned_ = std::max<uint32_t>(returned_ - n, 0);
+}
+
+void History::move_cursor_down(const int n) {
+  assert(0 < n);
+  assert(n <= active_.size() / columns_);
+  index_ = (index_ + n * columns_) % active_.size();
+  returned_ = 0;
+}
+
+void History::move_cursor_forward(const int n) {
+  assert(0 < n);
+  assert(n < columns_);
+  assert(columns_ >= (index_ % columns_) + n);
+  index_ += n;
+  returned_ = std::max<uint32_t>(returned_ - n, 0);
+}
+
+void History::move_cursor_up(const int n) {
+  assert(0 < n);
+  assert(n <= active_.size() / columns_);
+  index_ = (index_ - n * columns_) % active_.size();
+  returned_ = 0;
 }

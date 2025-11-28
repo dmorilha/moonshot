@@ -52,6 +52,7 @@ struct Rune {
   bool operator < (const Rune &) const; 
   operator std::string() const;
   operator bool () const { return L'\0' != character; }
+  operator int () const { return static_cast<int>(character); }
 
   friend RuneFactory;
   friend std::ostream & operator << (std::ostream &, const Rune &);

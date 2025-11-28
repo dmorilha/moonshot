@@ -4,20 +4,21 @@ CXX_FLAGS += -MMD
 CXX_FLAGS += -std=c++20
 
 #debug 
-#CC_FLAGS += -DDEBUG
-CC_FLAGS += -g
-#CC_FLAGS += -Og
+CC_FLAGS += -DDEBUG
+CC_FLAGS += -Og
 CC_FLAGS += -fno-omit-frame-pointer
-#CXX_FLAGS += -DDEBUG
-CXX_FLAGS += -g
-#CXX_FLAGS += -Og
+CC_FLAGS += -g
+
+CXX_FLAGS += -DDEBUG
+CXX_FLAGS += -Og
 CXX_FLAGS += -fno-omit-frame-pointer
+CXX_FLAGS += -g
 
 #release
-CC_FLAGS += -DNDEBUG
-CC_FLAGS += -O2
-CXX_FLAGS += -DNDEBUG
-CXX_FLAGS += -O2
+#CC_FLAGS += -DNDEBUG
+#CC_FLAGS += -O2
+#CXX_FLAGS += -DNDEBUG
+#CXX_FLAGS += -O2
 
 LIBS := -lwayland-client -lwayland-egl -lwayland-cursor -lxkbcommon -lEGL -lGL
 

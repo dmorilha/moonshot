@@ -106,7 +106,12 @@ struct Screen {
   Screen & operator = (const Screen &) = delete;
   Screen & operator = (Screen && other) = delete;
 
-  auto EL() -> void;
+  // cursor
+  auto move_cursor_backward(const int) -> void;
+  auto move_cursor_down(const int) -> void;
+  auto move_cursor_forward(const int) -> void;
+  auto move_cursor_up(const int) -> void;
+
   auto backspace() -> void;
   auto begin() -> void { }
   auto changeScrollY(int32_t) -> void;
@@ -115,19 +120,21 @@ struct Screen {
   auto commit() -> void { }
   auto drag(const uint16_t, const uint16_t) -> void;
   auto endSelection() -> void;
+  auto erase(const int) -> void;
+  auto erase_line_right() -> void;
   auto getColumn() const -> int32_t { return dimensions_.cursor_column(); }
   auto getColumns() const -> int32_t { return dimensions_.columns(); }
   auto getLine() const -> int32_t { return dimensions_.cursor_line(); }
   auto getLines() const -> int32_t { return dimensions_.lines(); }
+  auto insert(const int) -> void;
   auto pushBack(rune::Rune &&) -> void;
   auto repaint(const bool force = false, const bool alternative = false) -> void;
   auto resetScroll() -> void { dimensions_.scroll_y(0); }
   auto resize(const uint16_t, const uint16_t) -> void;
   auto setCursor(const uint16_t, const uint16_t) -> void;
-  auto setPosition(const uint16_t, const uint16_t) -> void;
   auto setTitle(const std::string &) -> void;
-  auto startSelection(const uint16_t, const uint16_t) -> void;
   auto shouldRepaint() -> bool { return FULL == repaint_; }
+  auto startSelection(const uint16_t, const uint16_t) -> void;
 
   std::function<void (int32_t, int32_t)> onResize;
 
@@ -140,6 +147,7 @@ private:
   auto history() -> History & { return history_; }
   auto makeCurrent() const -> void { surface_->egl().makeCurrent(); }
   auto overflow() -> int32_t;
+  auto pushCharacter(rune::Rune) -> void;
   auto recreateFromActiveHistory() -> void;
   auto recreateFromScrollback(const uint64_t index) -> void;
   auto renderCharacter(const Rectangle &, const rune::Rune &) -> void;
