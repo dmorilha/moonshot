@@ -86,7 +86,6 @@ int main(int argc, char ** argv) {
     pointer.x = 0 > x ? 0 : x;
     pointer.y = 0 > y ? 0 : y;
     if (pointer.leftPressed) {
-      screen.drag(pointer.x, pointer.y);
     }
   };
 
@@ -105,7 +104,6 @@ int main(int argc, char ** argv) {
     if (CLICK == state) {
       switch (button) {
       case LEFT:
-        screen.startSelection(pointer.x, pointer.y);
         break;
       default:
         break;
@@ -113,7 +111,6 @@ int main(int argc, char ** argv) {
     } else if (RELEASE == state) {
       switch (button) {
       case LEFT:
-        screen.endSelection();
         break;
       default:
         break;
