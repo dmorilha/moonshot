@@ -111,27 +111,28 @@ struct Screen {
   auto move_cursor_down(const int) -> void;
   auto move_cursor_forward(const int) -> void;
   auto move_cursor_up(const int) -> void;
+  auto move_cursor(const int, const int) -> void;
+
+  auto reverse_line_feed() -> void;
 
   auto backspace() -> void;
   auto begin() -> void { }
   auto changeScrollY(int32_t) -> void;
-  auto clear() -> void;
-  auto clearScrollback() -> void;
+  auto erase_display() -> void;
+  auto erase_scrollback() -> void;
   auto commit() -> void { }
   auto drag(const uint16_t, const uint16_t) -> void;
-  auto endSelection() -> void;
   auto erase(const int) -> void;
   auto erase_line_right() -> void;
-  auto getColumn() const -> int32_t { return dimensions_.cursor_column(); }
-  auto getColumns() const -> int32_t { return dimensions_.columns(); }
-  auto getLine() const -> int32_t { return dimensions_.cursor_line(); }
-  auto getLines() const -> int32_t { return dimensions_.lines(); }
+  auto column() const -> int32_t { return dimensions_.cursor_column(); }
+  auto columns() const -> int32_t { return dimensions_.columns(); }
+  auto line() const -> int32_t { return dimensions_.cursor_line(); }
+  auto lines() const -> int32_t { return dimensions_.lines(); }
   auto insert(const int) -> void;
   auto pushBack(rune::Rune &&) -> void;
   auto repaint(const bool force = false, const bool alternative = false) -> void;
   auto resetScroll() -> void { dimensions_.scroll_y(0); }
   auto resize(const uint16_t, const uint16_t) -> void;
-  auto setCursor(const uint16_t, const uint16_t) -> void;
   auto setTitle(const std::string &) -> void;
   auto shouldRepaint() -> bool { return FULL == repaint_; }
   auto startSelection(const uint16_t, const uint16_t) -> void;
@@ -141,13 +142,12 @@ struct Screen {
 private:
   Screen(std::unique_ptr<wayland::Surface> &&);
 
-  auto countLines(History::ReverseIterator &, const History::ReverseIterator &, const uint64_t limit = 0) const -> uint64_t;
   auto cursor(const uint64_t) const -> void;
   auto draw() -> void;
   auto history() -> History & { return history_; }
   auto makeCurrent() const -> void { surface_->egl().makeCurrent(); }
   auto overflow() -> int32_t;
-  auto pushCharacter(rune::Rune) -> void;
+  auto pushCharacter(rune::Rune) -> uint16_t;
   auto recreateFromActiveHistory() -> void;
   auto recreateFromScrollback(const uint64_t index) -> void;
   auto renderCharacter(const Rectangle &, const rune::Rune &) -> void;

@@ -121,8 +121,8 @@ std::unique_ptr<Terminal> Terminal::New(Screen & screen) {
     instance = std::unique_ptr<Terminal>(new vt100(screen));
   }
 
-  instance->winsize_.ws_col = screen.getColumns();
-  instance->winsize_.ws_row = screen.getLines();
+  instance->winsize_.ws_col = screen.columns();
+  instance->winsize_.ws_row = screen.lines();
 
   openpty(&instance->fd_.child, &instance->fd_.parent, nullptr, nullptr, &instance->winsize_);
 
@@ -156,10 +156,10 @@ void Terminal::write(const char * const key, const size_t length) {
 }
 
 void Terminal::resize(int32_t, int32_t) {
-  if (screen_.getColumns() != winsize_.ws_col
-    || screen_.getLines() != winsize_.ws_row) {
-    winsize_.ws_col = screen_.getColumns();
-    winsize_.ws_row = screen_.getLines();
+  if (screen_.columns() != winsize_.ws_col
+    || screen_.lines() != winsize_.ws_row) {
+    winsize_.ws_col = screen_.columns();
+    winsize_.ws_row = screen_.lines();
     assert(0 < fd_.child);
     const int result = ioctl(fd_.child, TIOCSWINSZ, &winsize_);
     assert(0 == result);
