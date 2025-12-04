@@ -610,11 +610,6 @@ void vt100::handleCSI(const char c) {
         handleSGR();
         break;
 
-      case 'K':
-        /* EL - clear(erase) line right of cursor */
-        screen_.erase_line_right();
-        break;
-
       case '@':
         /* The normal character attribute.
          * The cursor remains at the beginning of the blank characters.
@@ -632,7 +627,6 @@ void vt100::handleCSI(const char c) {
         break;
 
       case 'A':
-        /* CUU - move cursor up Ps lines */
         {
           const int argument = std::atoi(escapeSequence_.data());
           screen_.move_cursor_up(0 < argument ? argument : 1);
@@ -640,7 +634,6 @@ void vt100::handleCSI(const char c) {
         break;
 
       case 'B':
-        /* CUD - move cursor down Ps lines */
         {
           const int argument = std::atoi(escapeSequence_.data());
           screen_.move_cursor_down(0 < argument ? argument : 1);
@@ -648,7 +641,6 @@ void vt100::handleCSI(const char c) {
         break;
 
       case 'C':
-        /* CUF - move cursor right (forward) Ps lines */
         {
           const int argument = std::atoi(escapeSequence_.data());
           screen_.move_cursor_forward(0 < argument ? argument : 1);
@@ -656,11 +648,75 @@ void vt100::handleCSI(const char c) {
         break;
 
       case 'D':
-        /* CUB - move cursor left (back) Ps lines */
         {
           const int argument = std::atoi(escapeSequence_.data());
           screen_.move_cursor_backward(0 < argument ? argument : 1);
         }
+        break;
+
+      case 'E':
+        {
+          const int argument = std::atoi(escapeSequence_.data());
+          screen_.move_cursor(1, screen_.line() + 0 < argument ? argument : 1);
+        }
+        break;
+
+      case 'F':
+        {
+          const int argument = std::atoi(escapeSequence_.data());
+          screen_.move_cursor(1, screen_.line() - 0 < argument ? argument : 1);
+        }
+        break;
+
+      case 'G':
+        {
+          const int argument = std::atoi(escapeSequence_.data());
+          screen_.move_cursor(0 < argument ? argument : 1, screen_.line());
+        }
+        break;
+
+      case 'H':
+        {
+          uint16_t column = 1, line = 1;
+          if (2 < escapeSequence_.size()) {
+            std::istringstream stream{
+              std::string{escapeSequence_.begin(), escapeSequence_.end()}};
+            stream >> column;
+            char delimiter;
+            stream >> delimiter;
+            assert(';' == delimiter);
+            stream >> line;
+            column = std::max<uint16_t>(1, column);
+            line = std::max<uint16_t>(1, line);
+            assert(screen_.lines() >= line);
+            assert(screen_.columns() >= column);
+          }
+          screen_.move_cursor(column, line);
+        } break;
+
+      case 'J':
+        {
+          const std::size_t size = escapeSequence_.size();
+          if (2 == size) {
+            screen_.erase_display();
+          } else if (3 == size)  {
+            const int32_t argument = std::atoi(escapeSequence_.data());
+            switch (argument) {
+            case 2:
+              screen_.erase_display();
+              break;
+            case 3:
+              screen_.erase_scrollback();
+              break;
+            default:
+              assert(!"UNIMPLEMENTED");
+              break;
+            }
+          }
+        } break;
+
+      case 'K':
+        screen_.erase_line_right();
         break;
 
       case 'L':
@@ -673,45 +729,10 @@ void vt100::handleCSI(const char c) {
         assert(!"UNIMPLEMENTED");
         break;
 
-      case 'E':
-        assert(!"UNIMPLEMENTED");
-        break;
-
-      case 'F':
-        assert(!"UNIMPLEMENTED");
-        break;
-
       case '`':
         /* CBT - move cursor to column Ps */
         assert(!"UNIMPLEMENTED");
         break;
-
-      case 'G':
-        /* CHA - move cursor to column Ps */
-        assert(!"UNIMPLEMENTED");
-        break;
-
-      case 'J':
-        /* ED - erase display */
-        {
-          const std::size_t size = escapeSequence_.size();
-          if (2 == size) {
-            screen_.clear();
-          } else if (3 == size)  {
-            const int32_t argument = std::atoi(escapeSequence_.data());
-            switch (argument) {
-            case 2:
-              screen_.clear();
-              break;
-            case 3:
-              screen_.clearScrollback();
-              break;
-            default:
-              assert(!"UNIMPLEMENTED");
-              break;
-            }
-          }
-        } break;
 
       case 'd':
         /* VPA - move cursor to row Ps */
@@ -731,7 +752,7 @@ void vt100::handleCSI(const char c) {
             assert(';' == delimiter);
             stream >> bottom;
             top = std::max<int64_t>(1, top);
-            bottom = 1 > bottom ? screen_.getLines() - 1 : bottom;
+            bottom = 1 > bottom ? screen_.lines() - 1 : bottom;
             --top;
             --bottom;
             std::cout << top << ", " << bottom << std::endl;
@@ -740,7 +761,7 @@ void vt100::handleCSI(const char c) {
           }
 
           if (bottom > top) {
-            screen_.setCursor(1, 1);
+            screen_.move_cursor(1, 1);
           } else {
             assert(!"invalid DECSTBM sequence");
           }
@@ -775,26 +796,6 @@ void vt100::handleCSI(const char c) {
         /* HVP - move cursor to Px, Py */
         assert(!"UNIMPLEMENTED");
         break;
-
-      case 'H':
-        {
-          /* CUP - move cursor to Px, Py */
-          uint16_t column = 1, line = 1;
-          if (2 < escapeSequence_.size()) {
-            std::istringstream stream{
-              std::string{escapeSequence_.begin(), escapeSequence_.end()}};
-            stream >> column;
-            char delimiter;
-            stream >> delimiter;
-            assert(';' == delimiter);
-            stream >> line;
-            column = std::max<uint16_t>(1, column);
-            line = std::max<uint16_t>(1, line);
-            assert(screen_.getLines() >= line);
-            assert(screen_.getColumns() >= column);
-          }
-          screen_.setCursor(column, line);
-        } break;
 
       case 'c':
         /* report vt340 type device with sixel */
@@ -973,7 +974,7 @@ vt100::CharacterType vt100::handleCharacter(const wchar_t c) {
       break;
     case 'M':
       /* reverse line feed */
-      assert(!"UNIMPLEMENTED");
+      screen_.reverse_line_feed();
       state_ = LITERAL;
       break;
     case 'E':
@@ -1020,12 +1021,12 @@ vt100::CharacterType vt100::handleCharacter(const wchar_t c) {
       break;
     case '=':
       /* application keypad */
-      assert(!"UNIMPLEMENTED");
+      std::cerr << "set application keypad mode" << std::endl;
       state_ = LITERAL;
       break;
     case '>':
       /* normal keypad */
-      assert(!"UNIMPLEMENTED");
+      std::cerr << "set normal keypad mode" << std::endl;
       state_ = LITERAL;
       break;
     case '`':
@@ -1040,7 +1041,8 @@ vt100::CharacterType vt100::handleCharacter(const wchar_t c) {
       break;
     case 'c':
       /* reset initial state */
-      assert(!"UNIMPLEMENTED");
+      std::cerr << "reset initial state" << std::endl;
+      runeFactory_.reset();
       state_ = LITERAL;
       break;
     case '7':
