@@ -4,4 +4,5 @@
 flamegraph.html
 gecko_profile.json
 main*
+moonshot
 perf.data*
