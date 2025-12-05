@@ -375,7 +375,6 @@ void Screen::move_cursor(const int column, const int line) {
   assert(columns() >= column);
   assert(0 < line);
   assert(lines() >= line);
-  std::cout << __func__ << " " << column << ", " << line << std::endl;
   dimensions_.move_cursor(column, line);
   history_.move_cursor(column, line);
 }
@@ -942,12 +941,8 @@ void Screen::recreateFromActiveHistory() {
   // assert(dimensions_.surface_width() >= target.x);
 
   const auto cursor = history_.get_cursor();
-
-  std::cout << cursor.first  << ", " << cursor.second << std::endl
-    << last_column << ", " << last_line << std::endl;
-
-  dimensions_.displayed_lines(last_line);
-  move_cursor(last_column, last_line);
+  dimensions_.displayed_lines(cursor.second);
+  dimensions_.move_cursor(cursor.first + 1, cursor.second);
 }
 
 Pages::Entry & Pages::emplace_front(const int32_t height) {
