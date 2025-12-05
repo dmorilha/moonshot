@@ -326,7 +326,7 @@ void History::move_cursor(const int column, const int line) {
   assert(columns_ >= column);
   assert(0 < line);
   assert(active_.size() / columns_ >= line);
-  last_ = first_ + column + (line - 1) * columns_ - 1;
+  last_ = first_ + (line - 1) * columns_ + column - 0;
   last_ %= active_.size();
   if (0 == last_ % columns_) {
     --last_;
