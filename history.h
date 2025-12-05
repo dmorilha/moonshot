@@ -19,6 +19,7 @@ public:
   using ReverseIterator = Container::const_reverse_iterator;
 
   auto active_size() const -> uint32_t { return active_size_; }
+  auto alternative(const bool) -> void;
   auto at(const uint32_t) const -> const rune::Rune &;
   auto at(const uint16_t, const uint16_t) const -> const rune::Rune &;
   auto columns() const { return columns_; }
@@ -50,13 +51,6 @@ public:
   auto move_cursor_up(const int) -> void;
 
 private:
-  auto check_active_size() const -> uint32_t;
-
-  auto scrollback() -> void;
-
-  Container active_; // circular buffer representing the screen
-  Container scrollback_; // scrollback buffer
-
   /*
    * The difference between `scrollback_` and `active_` is that `scrollback_`
    * is a compressed representation of the screen, while `active_` is expanded
@@ -69,9 +63,22 @@ private:
    * `active_`.
    */
 
+  auto check_size(const Container &) const -> uint32_t;
+
+  auto scrollback() -> void;
+
+  Container scrollback_; // scrollback buffer
+  uint64_t scrollback_lines_ = 0;
+
+  Container active_; // circular buffer representing the screen
   uint16_t columns_ = 0;
   uint32_t active_size_ = 0;
   uint32_t first_ = 0;
   uint32_t last_ = 0;
-  uint64_t scrollback_lines_ = 0;
+
+  Container saved_;
+  uint16_t saved_columns_ = 0;
+  uint32_t saved_first_ = 0;
+  uint32_t saved_last_ = 0;
+  uint32_t saved_size_ = 0;
 };

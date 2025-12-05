@@ -40,6 +40,9 @@ private:
 
   CharacterType handleCharacter(const wchar_t);
 
+  void alternative_buffer_on();
+  void alternative_buffer_off();
+
   void handleAPC(const char);
   void handleCSI(const char);
   void handleDCS(const char);
@@ -52,9 +55,10 @@ private:
 
   void reportDeviceStatus(const int32_t);
 
+
   EscapeSequence escapeSequence_;
 
-  rune::RuneFactory runeFactory_;
+  rune::RuneFactory rune_factory_;
 
   enum {
     LITERAL,

@@ -14,6 +14,7 @@
 #include "wayland.h"
 
 struct Damage {
+  // expensive
   using Container = std::set<Rectangle>;
   auto area() const -> uint32_t;
   auto clear() -> void { container_.clear(); }
@@ -113,29 +114,28 @@ struct Screen {
   auto move_cursor_up(const int) -> void;
   auto move_cursor(const int, const int) -> void;
 
-  auto reverse_line_feed() -> void;
-
+  auto alternative(const bool) -> void;
   auto backspace() -> void;
   auto begin() -> void { }
   auto changeScrollY(int32_t) -> void;
-  auto erase_display() -> void;
-  auto erase_scrollback() -> void;
+  auto column() const -> int32_t { return dimensions_.cursor_column(); }
+  auto columns() const -> int32_t { return dimensions_.columns(); }
   auto commit() -> void { }
   auto drag(const uint16_t, const uint16_t) -> void;
   auto erase(const int) -> void;
+  auto erase_display() -> void;
   auto erase_line_right() -> void;
-  auto column() const -> int32_t { return dimensions_.cursor_column(); }
-  auto columns() const -> int32_t { return dimensions_.columns(); }
+  auto erase_scrollback() -> void;
+  auto insert(const int) -> void;
   auto line() const -> int32_t { return dimensions_.cursor_line(); }
   auto lines() const -> int32_t { return dimensions_.lines(); }
-  auto insert(const int) -> void;
   auto pushBack(rune::Rune &&) -> void;
   auto repaint(const bool force = false, const bool alternative = false) -> void;
   auto resetScroll() -> void { dimensions_.scroll_y(0); }
   auto resize(const uint16_t, const uint16_t) -> void;
+  auto reverse_line_feed() -> void;
   auto setTitle(const std::string &) -> void;
   auto shouldRepaint() -> bool { return FULL == repaint_; }
-  auto startSelection(const uint16_t, const uint16_t) -> void;
 
   std::function<void (int32_t, int32_t)> onResize;
 

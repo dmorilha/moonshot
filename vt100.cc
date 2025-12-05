@@ -216,6 +216,11 @@ void vt100::handleDecMode(const unsigned int code, const bool mode) {
   case 1047: /* use alternate screen buffer, xterm */
   case 1049:
     /* after saving the cursor, switch to the alternate screen buffer, clearing it first */
+    if (mode) {
+      alternative_buffer_on();
+    } else {
+      alternative_buffer_off();
+    }
     break;
 
   case 1051:
@@ -275,12 +280,12 @@ void vt100::handleSGRCommand(const int command) {
   switch (command) {
   case 0:
     /* normal (default) */
-    runeFactory_.reset();
+    rune_factory_.reset();
     break;
 
   case 1:
     /* bold, vt100 */
-    runeFactory_.isBold = true;
+    rune_factory_.isBold = true;
     break;
 
   case 2:
@@ -290,30 +295,30 @@ void vt100::handleSGRCommand(const int command) {
 
   case 3:
     /* italicized, ecma 48 2nd */
-    runeFactory_.isItalic = true;
+    rune_factory_.isItalic = true;
     break;
 
   case 4:
     /* underline */
-    runeFactory_.underline = true;
+    rune_factory_.underline = true;
     break;
 
   case 5:
     /* slow (less than 150 per minute) blink */
-    runeFactory_.blink = rune::Blink::SLOW;
+    rune_factory_.blink = rune::Blink::SLOW;
     break;
 
   case 6:
     /* fast blink (ms-dos), most terminals that implement this use the same speed */
-    runeFactory_.blink = rune::Blink::FAST;
+    rune_factory_.blink = rune::Blink::FAST;
     break;
 
   case 7:
     /* inverse colors */
     {
-      const Color color = runeFactory_.backgroundColor;
-      runeFactory_.backgroundColor = runeFactory_.foregroundColor;
-      runeFactory_.foregroundColor = color;
+      const Color color = rune_factory_.backgroundColor;
+      rune_factory_.backgroundColor = rune_factory_.foregroundColor;
+      rune_factory_.foregroundColor = color;
     } break;
 
   case 8:
@@ -323,7 +328,7 @@ void vt100::handleSGRCommand(const int command) {
 
   case 9:
     /* crossed-out characters, ecma 48 3rd */
-    runeFactory_.crossout = true;
+    rune_factory_.crossout = true;
     break;
 
   case 20:
@@ -338,22 +343,22 @@ void vt100::handleSGRCommand(const int command) {
 
   case 22:
     /* normal neither bold nor faint, ecma 48 3rd */
-    runeFactory_.isBold = false;
+    rune_factory_.isBold = false;
     break;
 
   case 23:
     /* not italicized, ecma 48, 3rd */
-    runeFactory_.isItalic = false;
+    rune_factory_.isItalic = false;
     break;
 
   case 24:
     /* not underlined, ecma 48, 3rd */
-    runeFactory_.underline = false;
+    rune_factory_.underline = false;
     break;
 
   case 25:
     /* steady (not blinking), ecma 48 3rd */
-    runeFactory_.blink = rune::Blink::STEADY;
+    rune_factory_.blink = rune::Blink::STEADY;
     break;
 
   case 27:
@@ -368,7 +373,7 @@ void vt100::handleSGRCommand(const int command) {
 
   case 29:
     /* not crossed-out, ecma 48 3rd */
-    runeFactory_.crossout = false;
+    rune_factory_.crossout = false;
     break;
 
   case 30 ... 37:
@@ -376,7 +381,7 @@ void vt100::handleSGRCommand(const int command) {
     {
       const auto iterator = Colors.find(command);
       if (Colors.cend() != iterator) {
-        runeFactory_.foregroundColor = iterator->second;
+        rune_factory_.foregroundColor = iterator->second;
       }
     } break;
 
@@ -386,7 +391,7 @@ void vt100::handleSGRCommand(const int command) {
 
   case 39:
     /* set foreground color to default, ecma 48 3rd */
-    runeFactory_.resetForegroundColor();
+    rune_factory_.resetForegroundColor();
     break;
 
   case 40 ... 47:
@@ -394,7 +399,7 @@ void vt100::handleSGRCommand(const int command) {
     {
       const auto iterator = Colors.find(command);
       if (Colors.cend() != iterator) {
-        runeFactory_.backgroundColor = iterator->second;
+        rune_factory_.backgroundColor = iterator->second;
       }
     } break;
 
@@ -404,7 +409,7 @@ void vt100::handleSGRCommand(const int command) {
 
   case 49:
     /* set background color to default, ecma 48 3rd */
-    runeFactory_.resetBackgroundColor();
+    rune_factory_.resetBackgroundColor();
     break;
 
   case 51:
@@ -926,10 +931,10 @@ vt100::CharacterType vt100::handleCharacter(const wchar_t c) {
       state_ = ESCAPE;
       break;
     case '\n':
-      screen_.pushBack(runeFactory_.make(c));
+      screen_.pushBack(rune_factory_.make(c));
       return CharacterType::terminal;
     default:
-      screen_.pushBack(runeFactory_.make(c));
+      screen_.pushBack(rune_factory_.make(c));
       break;
     }
     break;
@@ -1042,7 +1047,7 @@ vt100::CharacterType vt100::handleCharacter(const wchar_t c) {
     case 'c':
       /* reset initial state */
       std::cerr << "reset initial state" << std::endl;
-      runeFactory_.reset();
+      rune_factory_.reset();
       state_ = LITERAL;
       break;
     case '7':
@@ -1180,11 +1185,10 @@ vt100::CharacterType vt100::handleCharacter(const wchar_t c) {
   return CharacterType::terminal;
 }
 
-void vt100::reportDeviceStatus(const int32_t argument) {
+void vt100::reportDeviceStatus(const int argument) {
   switch (argument) {
-  case 6:
-    // std::cout << screen_.getColumn() << " " << screen_.getLine() << std::endl;
-    // I don't know what should be done here.
+  case 6: /* report cursor position */
+    escape("\e[?%u;%uR", screen_.line(), screen_.column());
     break;
   default:
     assert(!"UNIMPLEMENTED");
@@ -1291,3 +1295,13 @@ bool vt100::pollin(const std::optional<TimePoint> & t) {
   }
   return true;
 }
+
+void vt100::alternative_buffer_off() {
+  screen_.alternative(false);
+  rune_factory_.reset();
+}
+
+void vt100::alternative_buffer_on() {
+  screen_.alternative(true);
+}
+

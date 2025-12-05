@@ -303,13 +303,11 @@ uint16_t Screen::pushCharacter(rune::Rune rune) {
       renderCharacter(drawer.target, rune);
     }
 
-#if 1
     damage_.emplace(Rectangle{
       .x = drawer.target.x,
       .y = overflow(),
       .width = drawer.target.width,
       .height = drawer.target.height, });
-#endif
   }
 
   return columns;
@@ -941,6 +939,7 @@ void Screen::recreateFromActiveHistory() {
   // assert(dimensions_.surface_width() >= target.x);
 
   const auto cursor = history_.get_cursor();
+  std::cout << cursor.first << ", " << cursor.second << std::endl;
   dimensions_.displayed_lines(cursor.second);
   dimensions_.move_cursor(cursor.first + 1, cursor.second);
 }
@@ -1023,6 +1022,7 @@ void Damage::emplace(Rectangle && r) {
     container_.emplace(std::move(r));
     return;
   }
+#if 1 // turn optimization on/off
   auto iterator = container_.lower_bound(r);
   if (container_.end() == iterator) {
     --iterator;
@@ -1036,6 +1036,7 @@ void Damage::emplace(Rectangle && r) {
       container_.erase(iterator);
     }
   }
+#endif
   container_.emplace(std::move(r));
 }
 
@@ -1045,4 +1046,15 @@ uint32_t Damage::area() const {
     area += item.area();
   }
   return area;
+}
+
+void Screen::alternative(const bool mode) {
+  history_.alternative(mode);
+  if (mode) {
+    dimensions_.clear();
+    repaint_ = FULL;
+  } else {
+    /* maybe it can be optimized */
+    resize(dimensions_.surface_width(), dimensions_.surface_height());
+  }
 }
