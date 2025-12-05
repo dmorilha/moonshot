@@ -48,7 +48,7 @@ void Dimensions::displayed_lines(const uint16_t v) {
   displayed_lines_ = v;
 }
 
-void Dimensions::set_cursor(const uint16_t column, const uint16_t line) {
+void Dimensions::move_cursor(const uint16_t column, const uint16_t line) {
   assert(0 < column);
   assert(columns() >= column);
   assert(0 < line);

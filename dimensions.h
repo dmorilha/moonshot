@@ -30,13 +30,13 @@ public:
   auto glyph_width(const auto v) { glyph_width_ = v; }
   auto line_height() const { return line_height_; }
   auto line_height(const auto v) { line_height_ = v; }
+  auto move_cursor(const uint16_t, const uint16_t) -> void;
   auto new_line() -> bool;
   auto overflow() const { return overflow_; }
   auto reset(freetype::Face & face, const uint16_t, const uint16_t) -> void;
   auto scroll_y() const { return scroll_y_; }
   auto scroll_y(const auto v) { scroll_y_ = v; }
   auto scrollback_lines() const { return scrollback_lines_; }
-  auto set_cursor(const uint16_t, const uint16_t) -> void;
   auto surface_height() const { return surface_height_; }
   auto surface_width() const { return surface_width_; }
   auto wrap_next() const { return wrap_next_; }

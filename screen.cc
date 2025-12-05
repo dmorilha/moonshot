@@ -117,10 +117,6 @@ void Screen::resize(const uint16_t width, const uint16_t height) {
 
   { /* history */
     history_.resize(dimensions_.columns(), dimensions_.lines());
-#if 0
-    history_.print();
-    std::cout << std::endl;
-#endif
   }
 
   if (0 < history_.active_size()) {
@@ -353,7 +349,7 @@ void Screen::repaint(const bool force, const bool alternative) {
 #endif
 
     if (alternative) {
-      cursor(dimensions_.scroll_y());
+      draw_cursor(dimensions_.scroll_y());
     }
 
     const bool forceSwapBuffers = force || damage_.empty() || FULL == repaint_;
@@ -379,7 +375,8 @@ void Screen::move_cursor(const int column, const int line) {
   assert(columns() >= column);
   assert(0 < line);
   assert(lines() >= line);
-  dimensions_.set_cursor(column, line);
+  std::cout << __func__ << " " << column << ", " << line << std::endl;
+  dimensions_.move_cursor(column, line);
   history_.move_cursor(column, line);
 }
 
@@ -387,7 +384,7 @@ void Screen::reverse_line_feed() {
   const uint16_t line = Screen::line() - 1;
   assert(lines() > line);
   if (0 < line) {
-    dimensions_.set_cursor(column(), line);
+    dimensions_.move_cursor(column(), line);
     history_.move_cursor(column(), line);
   } else {
     std::cerr << __FILE__ << ":" << __LINE__ << " (" << __func__ << ") scrolling has not been implemented here." << std::endl;
@@ -492,7 +489,7 @@ Pages::Entry & Pages::update(Rectangle_Y & rectangle, const uint64_t index) {
     }
 
     // if it did not find a page, insert a new page at the end.
-    current_ = container_.emplace(container_.end(), entry(rectangle, index));
+    current_ = container_.emplace(container_.end(), new_entry(rectangle, index));
   }
   rectangle.y = height_ - (rectangle.y - current_->area.y) - rectangle.height;
 
@@ -776,13 +773,12 @@ void Screen::move_cursor_down(const int n) {
 }
 
 void Screen::move_cursor_up(const int n) {
-  const uint16_t line = Screen::line() - n;
-  if (0 < line) {
-    history_.move_cursor_up(n);
-    dimensions_.cursor_line(line);
-  } else {
-    assert(!"UNRECHEABLE");
+  uint16_t line = Screen::line() - n;
+  if (0 == line) {
+    line = 1;
   }
+  history_.move_cursor_up(n);
+  dimensions_.cursor_line(line);
 }
 
 void Screen::erase_display() {
@@ -885,27 +881,25 @@ void Screen::recreateFromActiveHistory() {
     .width = dimensions_.glyph_width(),
     .height = dimensions_.line_height(),
   };
-
   const uint16_t columns = history_.columns();
-  int16_t stride = 1, cursor_column = 1, lines = 1;
-  for (uint16_t i = 0; dimensions_.lines() > i; ++i) {
+  uint16_t column = 1, last_column = 1, last_line = 1, stride = 1;
+  for (uint16_t i = 1; dimensions_.lines() >= i; ++i) {
     for (uint16_t j = 1; columns > j; ++j) {
       target.width = dimensions_.glyph_width();
-      const uint32_t index = i * columns + j;
+      const uint32_t index = (i - 1) * columns + j;
       rune::Rune rune = history_.at(index);
       if (rune.iscontrol()) {
         switch (rune.character) {
         case L'\n':
-          std::cout << index << std::endl;
           break;
 
         case L'\0':
           break;
 
         case L'\t': // horizontal tab
-          stride = 8 - (cursor_column % 8);
-          if (columns < cursor_column + stride) {
-            stride = columns - cursor_column;
+          stride = 8 - (column % 8);
+          if (columns < column + stride) {
+            stride = columns - column;
           }
           target.width *= stride;
           rune.character = L' ';
@@ -918,6 +912,10 @@ void Screen::recreateFromActiveHistory() {
         }
       }
       if (static_cast<bool>(rune.character)) {
+        if (i >= last_line) {
+          last_line = i;
+          last_column = j + stride;
+        }
 #if 1
         glEnable(GL_SCISSOR_TEST);
         target(glScissor);
@@ -927,12 +925,10 @@ void Screen::recreateFromActiveHistory() {
 #endif
         renderCharacter(target, rune);
       }
-
       target.x += target.width;
-      cursor_column += columns;
+      column += stride;
     }
-    cursor_column = 1;
-    lines += 1;
+    column = 1;
     target.y -= dimensions_.line_height();
     target.x = 0;
   }
@@ -945,8 +941,13 @@ void Screen::recreateFromActiveHistory() {
   // assert(dimensions_.lines() >= lines);
   // assert(dimensions_.surface_width() >= target.x);
 
-  dimensions_.displayed_lines(lines);
-  // move_cursor(cursor_column, lines);
+  const auto cursor = history_.get_cursor();
+
+  std::cout << cursor.first  << ", " << cursor.second << std::endl
+    << last_column << ", " << last_line << std::endl;
+
+  dimensions_.displayed_lines(last_line);
+  move_cursor(last_column, last_line);
 }
 
 Pages::Entry & Pages::emplace_front(const int32_t height) {
@@ -966,7 +967,7 @@ Pages::Entry & Pages::emplace_front(const int32_t height) {
     .height = height,
   };
 
-  Pages::Entry & page = container_.emplace_front(entry(rectangle, 0));
+  Pages::Entry & page = container_.emplace_front(new_entry(rectangle, 0));
 
   if (1 == container_.size()) {
     current_ = container_.begin();
@@ -975,7 +976,7 @@ Pages::Entry & Pages::emplace_front(const int32_t height) {
   return page;
 }
 
-Pages::Entry Pages::entry(const Rectangle_Y & rectangle, const uint64_t index) {
+Pages::Entry Pages::new_entry(const Rectangle_Y & rectangle, const uint64_t index) {
   assert(0 < width_);
   assert(0 < height_);
 #if 1
@@ -1010,7 +1011,7 @@ bool Pages::has_alternative() const {
   return result;
 }
 
-void Screen::cursor(const uint64_t offset) const {
+void Screen::draw_cursor(const uint64_t offset) const {
   Rectangle target{static_cast<Rectangle>(dimensions_)};
   if (0 < offset) {
     return;

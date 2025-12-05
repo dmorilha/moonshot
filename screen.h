@@ -74,7 +74,7 @@ public:
   constexpr auto scale_width() const { return 2.f / width_; }
 
 private:
-  auto entry(const Rectangle_Y &, const uint64_t) -> Entry;
+  auto new_entry(const Rectangle_Y &, const uint64_t) -> Entry;
   auto update(Rectangle_Y &, const uint64_t) -> Entry &;
 
   Container container_;
@@ -142,7 +142,7 @@ struct Screen {
 private:
   Screen(std::unique_ptr<wayland::Surface> &&);
 
-  auto cursor(const uint64_t) const -> void;
+  auto draw_cursor(const uint64_t) const -> void;
   auto draw() -> void;
   auto history() -> History & { return history_; }
   auto makeCurrent() const -> void { surface_->egl().makeCurrent(); }
@@ -157,7 +157,7 @@ private:
   CharacterMap characters_;
   Dimensions dimensions_;
   History history_;
-  Pages pages_{/* total number of entries */ 3};
+  Pages pages_{/* total number of entries */ 2};
   Damage damage_;
   Repaint repaint_ = NO;
   opengl::Shader glProgram_;

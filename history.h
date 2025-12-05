@@ -33,6 +33,7 @@ public:
   auto lines() const -> std::size_t { return scrollback_lines_; }
   auto new_line() -> void;
   auto print() const -> void;
+  auto print_scrollback() const -> void;
   auto rbegin() const -> ReverseIterator { return scrollback_.rbegin(); }
   auto rend() const -> ReverseIterator { return scrollback_.rend(); }
   auto resize(const uint16_t, const uint16_t) -> void;
@@ -40,7 +41,8 @@ public:
   auto scrollback_size() const -> uint64_t { return scrollback_.size(); }
   auto size() const -> uint64_t;
 
-  // cursor
+  // cursor, manipulates the last_ position.
+  auto get_cursor() const -> std::pair<uint16_t, uint16_t>;
   auto move_cursor(const int, const int) -> void;
   auto move_cursor_backward(const int) -> void;
   auto move_cursor_down(const int) -> void;
@@ -54,6 +56,18 @@ private:
 
   Container active_; // circular buffer representing the screen
   Container scrollback_; // scrollback buffer
+
+  /*
+   * The difference between `scrollback_` and `active_` is that `scrollback_`
+   * is a compressed representation of the screen, while `active_` is expanded
+   * in the sense that each character is in the right column and line
+   * coordinate, considering a circular buffer.
+   * Nonprintables are mostly excluded, and the new line character goes at
+   * "column 0" in the `active_` container, therefore there is one additional
+   * column.
+   * It should be fairly simple to transform from `scrollback_` back to
+   * `active_`.
+   */
 
   uint16_t columns_ = 0;
   uint32_t active_size_ = 0;

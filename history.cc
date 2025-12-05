@@ -51,7 +51,13 @@ void History::scrollback() {
   assert(0 < columns_);
   assert(0 == first_ % columns_);
   bool new_line = true;
+  uint32_t counter = 0;
   do {
+    new_line = active_[first_];
+    if (new_line) {
+      --active_size_;
+      active_[first_] = rune::Rune(L'\0');
+    }
     for (uint32_t i = 1; i < columns_; ++i) {
       rune::Rune & rune = active_[first_ + i];
       if (static_cast<bool>(rune)) {
@@ -60,10 +66,12 @@ void History::scrollback() {
         --active_size_;
       }
     }
-    new_line = active_[first_];
-    active_[first_] = rune::Rune(L'\0');
     first_ += columns_;
     first_ %= active_.size();
+    ++counter;
+    if (active_.size() == counter) {
+      break;
+    }
   } while ( ! new_line);
   scrollback_.push_back(rune::Rune(L'\n'));
   ++scrollback_lines_;
@@ -105,7 +113,7 @@ void History::resize(uint16_t columns, const uint16_t lines) {
       new_line();
     }
   }
-#if not NDEBUG
+#if false
   if (size() != sizeBefore) {
     std::cerr << "size " << size() << " is different than size before " << sizeBefore << std::endl
       << active_size_ << " " << check_active_size() << std::endl;
@@ -163,9 +171,11 @@ void History::print() const {
   std::cout << __FILE__ << ":" << __LINE__ << " " << __func__ << std::endl;
   uint32_t i = first_;
   while (last_ != i) {
+#if 0
     if (0 == i % columns_) {
       continue;
     }
+#endif
     if (static_cast<bool>(active_[i])) {
       std::cout << active_[i] << std::flush;
     }
@@ -175,6 +185,16 @@ void History::print() const {
       i %= active_.size();
     }
   }
+}
+
+void History::print_scrollback() const {
+  std::cout << __FILE__ << ":" << __LINE__ << " " << __func__ << std::endl;
+  for (const auto & rune : scrollback_) {
+    if (static_cast<bool>(rune)) {
+      std::cout << rune << std::flush;
+    }
+  }
+  std::cout << std::endl;
 }
 
 const rune::Rune & History::at(const uint32_t i) const {
@@ -200,12 +220,12 @@ void History::erase_display() {
 void History::erase_line_right() {
   assert(0 < columns_);
   uint32_t index = last_;
-  if (active_.size() == index) {
+  if (active_.size() <= index) {
     index = 1;
   } else if (0 == index % columns_) {
     ++index;
   }
-  for (uint32_t index = last_; 0 != index % columns_; ++index) {
+  for (; 0 != index % columns_; ++index) {
     active_[index] = rune::Rune('\0');
   }
 }
@@ -236,7 +256,6 @@ void History::insert(const int n) {
     end = dst - n,
     src = last_;
   std::copy_backward(active_.data() + src, active_.data() + end, active_.data() + dst); 
-
   for (uint32_t index = last_; last_ + n > index; ++index) {
     if (!static_cast<bool>(active_[index].character)) {
       ++active_size_;
@@ -247,41 +266,59 @@ void History::insert(const int n) {
 
 uint32_t History::check_active_size() const {
   return std::count_if(active_.begin(), active_.end(),
-      [](const rune::Rune & r) {
-        return L'\0' != r && L'\n' != r;
-      });
+      [](const rune::Rune & r) { return static_cast<bool>(r); });
 }
 
 void History::move_cursor_backward(const int n) {
+  std::cout << __func__ << " " << n << std::endl;
   assert(0 < n);
   assert(n < columns_ - 1);
   const uint32_t column = (last_ % columns_);
   assert(n < column);
   last_ -= n;
-  assert(0 < last_ % columns_);
+  assert(0 <= last_);
+  assert(active_.size() > last_);
+  last_ %= active_.size(); // it should never happen
+  if (0 == last_ % columns_) {
+    --last_;
+  }
 }
 
 void History::move_cursor_down(const int n) {
+  std::cout << __func__ << " " << n << std::endl;
   assert(0 < n);
   assert(n <= active_.size() / columns_);
-  last_ += columns_ * n;
+  last_ += columns_ * n - 1;
   last_ %= active_.size();
+  if (0 == last_ % columns_) {
+    --last_;
+  }
 }
 
 void History::move_cursor_forward(const int n) {
+  std::cout << __func__ << " " << n << std::endl;
   assert(0 < n);
   assert(n < columns_ - 1);
   const uint32_t column = (last_ % columns_);
   assert(n + column < columns_);
   last_ += n;
-  assert(0 < last_ % columns_);
+  assert(0 <= last_);
+  assert(active_.size() > last_);
+  last_ %= active_.size(); // it should never happen
+  if (0 == last_ % columns_) {
+    --last_;
+  }
 }
 
 void History::move_cursor_up(const int n) {
+  std::cout << __func__ << " " << n << std::endl;
   assert(0 < n);
   assert(n <= active_.size() / columns_);
-  last_ -= columns_ * n;
+  last_ -= columns_ * n - 1;
   last_ %= active_.size();
+  if (0 == last_ % columns_) {
+    --last_;
+  }
 }
 
 void History::move_cursor(const int column, const int line) {
@@ -289,17 +326,28 @@ void History::move_cursor(const int column, const int line) {
   assert(columns_ >= column);
   assert(0 < line);
   assert(active_.size() / columns_ >= line);
-  last_ = column + (line - 1) * columns_;
-  assert(0 < last_ % columns_);
+  last_ = first_ + column + (line - 1) * columns_ - 1;
+  last_ %= active_.size();
+  if (0 == last_ % columns_) {
+    --last_;
+  }
 }
 
 void History::carriage_return() {
   assert(0 < columns_);
+  if (-1 == last_) {
+    return;
+  }
+  assert(active_.size() > last_);
   last_ = last_ - (last_ % columns_);
+  std::cout << __func__ << " " << last_ << std::endl;
 }
 
 void History::new_line() {
-  active_[last_ - (last_ % columns_)] = rune::Rune(L'\n');
+  rune::Rune & rune = active_[last_ - (last_ % columns_)];
+  assert( ! static_cast<bool>(rune));
+  rune = rune::Rune(L'\n');
+  ++active_size_;
   last_ = (last_ + columns_) % active_.size();
   if (last_ >= first_ && last_ < first_ + columns_) {
     scrollback();
@@ -308,4 +356,12 @@ void History::new_line() {
 
 uint64_t History::size() const {
   return scrollback_size() + active_size_;
+}
+
+std::pair<uint16_t, uint16_t> History::get_cursor() const {
+  std::pair<uint16_t, uint16_t> cursor{0, 0};
+  const uint32_t position = last_ - first_ % active_.size();
+  cursor.first = position % columns_;
+  cursor.second = 1 + (position / columns_);
+  return cursor;
 }
