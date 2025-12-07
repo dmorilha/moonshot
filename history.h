@@ -31,9 +31,11 @@ public:
   auto erase(const int) -> void;
   auto erase_line_right() -> void;
   auto insert(const int) -> void;
+  auto is_scrollback_disabled() const -> bool { return ! saved_.empty(); }
+  auto is_scrollback_enabled() const -> bool { return saved_.empty(); }
   auto lines() const -> std::size_t { return scrollback_lines_; }
   auto new_line() -> void;
-  auto print() const -> void;
+  auto print_active() const -> void;
   auto print_scrollback() const -> void;
   auto rbegin() const -> ReverseIterator { return scrollback_.rbegin(); }
   auto rend() const -> ReverseIterator { return scrollback_.rend(); }

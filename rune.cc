@@ -27,20 +27,26 @@ bool Rune::operator < (const Rune & o) const {
 
 Rune RuneFactory::make(const wchar_t c) {
   Rune rune(c);
-  if (isBold && isItalic) {
+  if (is_bold && is_italic) {
     rune.style = Style::BOLD_AND_ITALIC;
-  } else if (isBold) {
+  } else if (is_bold) {
     rune.style = Style::BOLD;
-  } else if (isItalic) {
+  } else if (is_italic) {
     rune.style = Style::ITALIC;
   } else {
     rune.style = Style::REGULAR;
   }
 
-  rune.backgroundColor = backgroundColor;
+  if (invert_colors) {
+    rune.backgroundColor = foreground_color;
+    rune.foregroundColor = background_color;
+  } else {
+    rune.backgroundColor = background_color;
+    rune.foregroundColor = foreground_color;
+  }
+
   rune.blink = blink;
   rune.crossout = crossout;
-  rune.foregroundColor = foregroundColor;
   rune.underline = underline;
 
   return rune;

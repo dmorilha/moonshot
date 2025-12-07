@@ -48,8 +48,7 @@ void History::emplace(rune::Rune rune) {
 }
 
 void History::scrollback() {
-  /* scrollback is disabled when alternative is on */ 
-  if ( ! saved_.empty()) {
+  if (is_scrollback_disabled()) {
     return;
   }
   assert(0 < columns_);
@@ -174,7 +173,7 @@ uint64_t History::count_lines(History::ReverseIterator & iterator, const History
   return lines;
 }
 
-void History::print() const {
+void History::print_active() const {
   std::cout << __FILE__ << ":" << __LINE__ << " " << __func__ << std::endl;
   uint32_t i = first_ + 1;
   while (last_ != i) {
@@ -275,6 +274,9 @@ void History::move_cursor_backward(const int n) {
   assert(0 < n);
   assert(n < columns_ - 1);
   const uint32_t column = (last_ % columns_);
+  if (1 == column) {
+    return;
+  }
   assert(n < column);
   last_ -= n;
   assert(0 <= last_);
@@ -347,13 +349,18 @@ void History::carriage_return() {
 void History::new_line() {
   std::cout << __func__ << " " << last_ << std::endl;
   rune::Rune & rune = active_[last_ - (last_ % columns_)];
-  assert( ! static_cast<bool>(rune));
-  rune = rune::Rune(L'\n');
-  ++active_size_;
   last_ = (last_ + columns_) % active_.size();
-  if (last_ >= first_ && last_ < first_ + columns_) {
-    scrollback();
+  if (is_scrollback_enabled()) {
+    assert( ! static_cast<bool>(rune));
+    if (last_ >= first_ && last_ < first_ + columns_) {
+      scrollback();
+    }
+  } else /* scrollback is disabled */ {
+    if ( ! static_cast<bool>(rune)) {
+      ++active_size_;
+    }
   }
+  rune = rune::Rune(L'\n');
 }
 
 uint64_t History::size() const {

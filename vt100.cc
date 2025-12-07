@@ -285,7 +285,7 @@ void vt100::handleSGRCommand(const int command) {
 
   case 1:
     /* bold, vt100 */
-    rune_factory_.isBold = true;
+    rune_factory_.is_bold = true;
     break;
 
   case 2:
@@ -295,7 +295,7 @@ void vt100::handleSGRCommand(const int command) {
 
   case 3:
     /* italicized, ecma 48 2nd */
-    rune_factory_.isItalic = true;
+    rune_factory_.is_italic = true;
     break;
 
   case 4:
@@ -315,11 +315,8 @@ void vt100::handleSGRCommand(const int command) {
 
   case 7:
     /* inverse colors */
-    {
-      const Color color = rune_factory_.backgroundColor;
-      rune_factory_.backgroundColor = rune_factory_.foregroundColor;
-      rune_factory_.foregroundColor = color;
-    } break;
+    rune_factory_.invert_colors = true;
+    break;
 
   case 8:
     /* invisible, hidden, ecma 48 2nd, vt300 */
@@ -343,12 +340,12 @@ void vt100::handleSGRCommand(const int command) {
 
   case 22:
     /* normal neither bold nor faint, ecma 48 3rd */
-    rune_factory_.isBold = false;
+    rune_factory_.is_bold = false;
     break;
 
   case 23:
     /* not italicized, ecma 48, 3rd */
-    rune_factory_.isItalic = false;
+    rune_factory_.is_italic = false;
     break;
 
   case 24:
@@ -363,7 +360,7 @@ void vt100::handleSGRCommand(const int command) {
 
   case 27:
     /* positive (not inverse), ecma 48 3rd */
-    // r->invert = false;
+    rune_factory_.invert_colors = false;
     break;
 
   case 28:
@@ -381,7 +378,7 @@ void vt100::handleSGRCommand(const int command) {
     {
       const auto iterator = Colors.find(command);
       if (Colors.cend() != iterator) {
-        rune_factory_.foregroundColor = iterator->second;
+        rune_factory_.foreground_color = iterator->second;
       }
     } break;
 
@@ -391,7 +388,7 @@ void vt100::handleSGRCommand(const int command) {
 
   case 39:
     /* set foreground color to default, ecma 48 3rd */
-    rune_factory_.resetForegroundColor();
+    rune_factory_.reset_foreground_color();
     break;
 
   case 40 ... 47:
@@ -399,7 +396,7 @@ void vt100::handleSGRCommand(const int command) {
     {
       const auto iterator = Colors.find(command);
       if (Colors.cend() != iterator) {
-        rune_factory_.backgroundColor = iterator->second;
+        rune_factory_.background_color = iterator->second;
       }
     } break;
 
@@ -409,7 +406,7 @@ void vt100::handleSGRCommand(const int command) {
 
   case 49:
     /* set background color to default, ecma 48 3rd */
-    rune_factory_.resetBackgroundColor();
+    rune_factory_.reset_background_color();
     break;
 
   case 51:
@@ -1145,7 +1142,6 @@ vt100::CharacterType vt100::handleCharacter(const wchar_t c) {
     }
     break;
   case CHARSET_G0:
-    assert(!"UNIMPLEMENTED");
     break;
   case CHARSET_G1:
     assert(!"UNIMPLEMENTED");

@@ -65,14 +65,15 @@ struct RuneFactory {
   Rune make(const wchar_t);
 
   void reset();
-  void resetBackgroundColor() { backgroundColor = colors::black; }
-  void resetForegroundColor() { foregroundColor = colors::white; }
+  void reset_background_color() { background_color = colors::black; }
+  void reset_foreground_color() { foreground_color = colors::white; }
 
-  Color backgroundColor = colors::black;
-  Color foregroundColor = colors::white;
+  Color background_color = colors::black;
+  Color foreground_color = colors::white;
   bool crossout = false;
-  bool isBold = false;
-  bool isItalic = false;
+  bool invert_colors = false;
+  bool is_bold = false;
+  bool is_italic = false;
   bool underline = false;
   Blink blink = Blink::STEADY;
 };

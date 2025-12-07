@@ -973,7 +973,7 @@ Pages::Entry & Pages::emplace_front(const int32_t height) {
 Pages::Entry Pages::new_entry(const Rectangle_Y & rectangle, const uint64_t index) {
   assert(0 < width_);
   assert(0 < height_);
-#if 1
+#if 0
   const Color color{
     .red = static_cast<float>(drand48()),
     .green = static_cast<float>(drand48()),
