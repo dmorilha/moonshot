@@ -1297,7 +1297,6 @@ bool vt100::pollin(const std::optional<TimePoint> & t) {
 
 void vt100::alternative_buffer_off() {
   screen_.alternative(false);
-  rune_factory_.reset();
 }
 
 void vt100::alternative_buffer_on() {

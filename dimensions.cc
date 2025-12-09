@@ -31,16 +31,16 @@ void Dimensions::clear() {
 }
 
 bool Dimensions::new_line() {
-  const bool add_scrollback_line = lines() <= displayed_lines_;
-  if (add_scrollback_line) {
+  if (lines() <= displayed_lines_) {
     overflow_ = 0 < remainder();
     scrollback_lines_ += 1;
     displayed_lines_ = cursor_line_ = lines();
+    return true;
   } else {
     assert( ! overflow_);
     displayed_lines_ = cursor_line_ += 1;
   }
-  return add_scrollback_line;
+  return false;
 }
 
 void Dimensions::displayed_lines(const uint16_t v) {
@@ -54,7 +54,11 @@ void Dimensions::move_cursor(const uint16_t column, const uint16_t line) {
   assert(0 < line);
   assert(lines() >= line);
   cursor_column_ = column;
+  wrap_next_ = columns() < cursor_column_;
   cursor_line_ = line;
+  if (displayed_lines_ < cursor_line_) {
+    displayed_lines_ = cursor_line_;
+  }
 }
 
 Dimensions::operator Rectangle_Y () const {
@@ -94,14 +98,17 @@ Dimensions::operator Rectangle () const {
 
 void Dimensions::cursor_column(const uint16_t v) {
   assert(0 < v);
-  wrap_next_ = columns() < v;
   cursor_column_ = v;
+  wrap_next_ = columns() < cursor_column_;
 }
 
 void Dimensions::cursor_line(const uint16_t v) {
   assert(0 < v);
   assert(lines() >= v);
   cursor_line_ = v;
+  if (displayed_lines_ < cursor_line_) {
+    displayed_lines_ = cursor_line_;
+  }
 }
 
 void Dimensions::reset(freetype::Face & face, const uint16_t width, const uint16_t height) {

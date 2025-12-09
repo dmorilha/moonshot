@@ -256,6 +256,7 @@ void Screen::pushBack(rune::Rune && rune) {
     return;
 
   case L'\n': // new line
+    new_line();
     if (dimensions_.new_line()) {
       repaint_ = FULL;
     }
@@ -1050,6 +1051,7 @@ uint32_t Damage::area() const {
 
 void Screen::alternative(const bool mode) {
   history_.alternative(mode);
+#if 1
   if (mode) {
     dimensions_.clear();
     repaint_ = FULL;
@@ -1057,4 +1059,12 @@ void Screen::alternative(const bool mode) {
     /* maybe it can be optimized */
     resize(dimensions_.surface_width(), dimensions_.surface_height());
   }
+#else
+    resize(dimensions_.surface_width(), dimensions_.surface_height());
+#endif
+}
+
+void Screen::new_line() {
+  Rectangle_Y rectangle = static_cast<Rectangle_Y>(dimensions_);
+  pages_.draw(rectangle, history_.size());
 }

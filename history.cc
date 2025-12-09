@@ -9,6 +9,9 @@ void History::emplace(rune::Rune rune) {
 
   if (rune.iscontrol()) {
     switch (rune.character) {
+    case L'\n':
+      return;
+
     case L'\t': // horizontal tab
       stride = 8 - ((last_ % columns_) % 8);
       break;
@@ -33,7 +36,11 @@ void History::emplace(rune::Rune rune) {
   }
 
   if ( ! static_cast<bool>(active_[last_])) {
+#if 0
+    std::cout << __func__ << " " << __LINE__ << " ++active_size_ = " << ++active_size_ << std::endl;
+#else
     ++active_size_;
+#endif
   }
 
   active_[last_] = std::move(rune);
@@ -56,9 +63,13 @@ void History::scrollback() {
   bool new_line = true;
   uint32_t counter = 0;
   do {
-    new_line = active_[first_];
+    new_line = L'\n' == active_[first_];
     if (new_line) {
+#if 0
+      std::cout << __func__ << " " << __LINE__ << " --active_size_ = " << --active_size_ << std::endl;
+#else
       --active_size_;
+#endif
       active_[first_] = rune::Rune(L'\0');
     }
     for (uint32_t i = 1; i < columns_; ++i) {
@@ -66,7 +77,11 @@ void History::scrollback() {
       if (static_cast<bool>(rune)) {
         scrollback_.push_back(rune);
         rune = rune::Rune(L'\0');
+#if 0
+        std::cout << __func__ << " " << __LINE__ << " --active_size_ = " << --active_size_ << std::endl;
+#else
         --active_size_;
+#endif
       }
     }
     first_ += columns_;
@@ -119,7 +134,7 @@ void History::resize(uint16_t columns, const uint16_t lines) {
       new_line();
     }
   }
-#if false
+#if not NDEBUG
   if (size() != sizeBefore) {
     std::cerr << "size " << size() << " is different than size before " << sizeBefore << std::endl
       << active_size_ << " " << check_size(active_) << std::endl;
@@ -257,8 +272,12 @@ void History::insert(const int n) {
     src = last_;
   std::copy_backward(active_.data() + src, active_.data() + end, active_.data() + dst); 
   for (uint32_t index = last_; last_ + n > index; ++index) {
-    if (!static_cast<bool>(active_[index].character)) {
+    if ( ! static_cast<bool>(active_[index].character)) {
+#if 0
+      std::cout << __func__ << " " << __LINE__ << " ++active_size_ = " << ++active_size_ << std::endl;
+#else
       ++active_size_;
+#endif
     }
     active_[index].character = L' ';
   }
@@ -270,7 +289,6 @@ uint32_t History::check_size(const Container & c) const {
 }
 
 void History::move_cursor_backward(const int n) {
-  std::cout << __func__ << " " << n << std::endl;
   assert(0 < n);
   assert(n < columns_ - 1);
   const uint32_t column = (last_ % columns_);
@@ -288,7 +306,6 @@ void History::move_cursor_backward(const int n) {
 }
 
 void History::move_cursor_down(const int n) {
-  std::cout << __func__ << " " << n << std::endl;
   assert(0 < n);
   assert(n <= active_.size() / columns_);
   last_ += columns_ * n - 1;
@@ -299,7 +316,6 @@ void History::move_cursor_down(const int n) {
 }
 
 void History::move_cursor_forward(const int n) {
-  std::cout << __func__ << " " << n << std::endl;
   assert(0 < n);
   assert(n < columns_ - 1);
   const uint32_t column = (last_ % columns_);
@@ -314,7 +330,6 @@ void History::move_cursor_forward(const int n) {
 }
 
 void History::move_cursor_up(const int n) {
-  std::cout << __func__ << " " << n << std::endl;
   assert(0 < n);
   assert(n <= active_.size() / columns_);
   last_ -= columns_ * n - 1;
@@ -343,21 +358,28 @@ void History::carriage_return() {
   }
   assert(active_.size() > last_);
   last_ = last_ - (last_ % columns_);
-  std::cout << __func__ << " " << last_ << std::endl;
 }
 
 void History::new_line() {
-  std::cout << __func__ << " " << last_ << std::endl;
   rune::Rune & rune = active_[last_ - (last_ % columns_)];
   last_ = (last_ + columns_) % active_.size();
   if (is_scrollback_enabled()) {
     assert( ! static_cast<bool>(rune));
+#if 0
+    std::cout << __func__ << " " << __LINE__ << " ++active_size_ = " << ++active_size_ << std::endl;
+#else
+    ++active_size_;
+#endif
     if (last_ >= first_ && last_ < first_ + columns_) {
       scrollback();
     }
   } else /* scrollback is disabled */ {
     if ( ! static_cast<bool>(rune)) {
-      ++active_size_;
+#if 0
+      std::cout << __func__ << " " << __LINE__ << " ++active_size_ = " << ++active_size_ << std::endl;
+#else
+    ++active_size_;
+#endif
     }
   }
   rune = rune::Rune(L'\n');

@@ -60,14 +60,13 @@ public:
 
   auto draw(Rectangle_Y, const uint64_t) -> Drawer;
   auto emplace_front(const int32_t) -> Entry &;
+  auto front_index() const -> uint64_t { return container_.empty() ? 0 : container_.front().index; }
+  auto front_y() const -> int64_t { return container_.empty() ? 0 : container_.front().area.y; }
+  auto has_alternative() const -> bool;
   auto is_current(Entry & entry) const -> bool { return current_->framebuffer == entry.framebuffer; }
   auto paint(const uint16_t frame = 0) -> bool;
   auto repaint(const Rectangle, const int64_t, const bool alternative = false) -> void;
   auto reset(const uint16_t, const uint16_t) -> void;
-
-  auto has_alternative() const -> bool;
-  auto front_index() const -> uint64_t { return container_.empty() ? 0 : container_.front().index; }
-  auto front_y() const -> int64_t { return container_.empty() ? 0 : container_.front().area.y; }
   auto total_height() const -> uint32_t;
 
   constexpr auto height() const { return height_; }
@@ -146,6 +145,7 @@ private:
   auto draw() -> void;
   auto history() -> History & { return history_; }
   auto makeCurrent() const -> void { surface_->egl().makeCurrent(); }
+  auto new_line() -> void;
   auto overflow() -> int32_t;
   auto pushCharacter(rune::Rune) -> uint16_t;
   auto recreateFromActiveHistory() -> void;
