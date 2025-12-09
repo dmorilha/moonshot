@@ -1,3 +1,5 @@
+// Copyright Daniel Morilha 2025
+
 #include "types.h"
 
 Rectangle_Y::operator Rectangle () const {

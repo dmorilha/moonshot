@@ -1,3 +1,5 @@
+# Copyright Daniel Morilha 2025
+
 C_FLAGS += -MMD
 
 CXX_FLAGS += -MMD

@@ -1,3 +1,5 @@
+// Copyright Daniel Morilha 2025
+
 #include <chrono>
 #include <memory>
 

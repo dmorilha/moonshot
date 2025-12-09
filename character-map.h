@@ -1,3 +1,5 @@
+// Copyright Daniel Morilha 2025
+
 #pragma once
 
 #include <map>
