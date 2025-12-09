@@ -382,8 +382,6 @@ std::pair<uint16_t, uint16_t> History::get_cursor() const {
 
 void History::alternative(const bool mode) {
   if (mode) {
-    const auto cursor = get_cursor();
-    std::cout << cursor.first << ", " << cursor.second << std::endl;
     saved_ = Container(active_.size());
     std::swap(saved_, active_);
     saved_columns_ = columns_;
@@ -392,16 +390,8 @@ void History::alternative(const bool mode) {
     saved_size_ = active_size_;
     active_size_ = first_ = last_ = 0;
   } else {
-    {
-    const auto cursor = get_cursor();
-    std::cout << cursor.first << ", " << cursor.second << std::endl;
-    }
     std::swap(saved_, active_);
     std::swap(columns_, saved_columns_);
-    {
-    const auto cursor = get_cursor();
-    std::cout << cursor.first << ", " << cursor.second << std::endl;
-    }
     assert(0 == saved_.size() % saved_columns_);
 #if 1
     assert(columns_ == saved_columns_);
