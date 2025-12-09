@@ -464,11 +464,11 @@ void vt100::handleSGRCommand(const int command) {
 }
 
 void vt100::handleSGR() {
-  std::cerr << "Full SGR escape sequence " << escapeSequence_.data() << std::endl;
-
   std::vector<const char *> codes;
 
-  {
+  std::cerr << "Full SGR escape sequence " << escapeSequence_.data() << " " << std::endl;
+
+  if (1 < escapeSequence_.size()) {
     const EscapeSequence::iterator END = escapeSequence_.end();
     EscapeSequence::iterator token = escapeSequence_.begin(),
       iterator = token;
@@ -487,6 +487,9 @@ void vt100::handleSGR() {
       }
     }
     assert(!codes.empty());
+  } else {
+    handleSGRCommand(0);
+    return;
   }
 
   /* requires a color parser */
@@ -683,11 +686,11 @@ void vt100::handleCSI(const char c) {
           if (2 < escapeSequence_.size()) {
             std::istringstream stream{
               std::string{escapeSequence_.begin(), escapeSequence_.end()}};
-            stream >> column;
+            stream >> line;
             char delimiter;
             stream >> delimiter;
             assert(';' == delimiter);
-            stream >> line;
+            stream >> column;
             column = std::max<uint16_t>(1, column);
             line = std::max<uint16_t>(1, line);
             assert(screen_.lines() >= line);
