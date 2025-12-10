@@ -942,7 +942,6 @@ void Screen::recreateFromActiveHistory() {
   // assert(dimensions_.surface_width() >= target.x);
 
   const auto cursor = history_.get_cursor();
-  std::cout << cursor.first << ", " << cursor.second << std::endl;
   dimensions_.displayed_lines(cursor.second);
   dimensions_.move_cursor(cursor.first + 1, cursor.second);
 }

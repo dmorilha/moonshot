@@ -4,6 +4,8 @@
 
 #include "history.h"
 
+#define DEBUG_ACTIVE_SIZE 0
+
 void History::emplace(rune::Rune rune) {
   assert(0 < columns_);
 
@@ -38,7 +40,7 @@ void History::emplace(rune::Rune rune) {
   }
 
   if ( ! static_cast<bool>(active_[last_])) {
-#if 0
+#if DEBUG_ACTIVE_SIZE
     std::cout << __func__ << " " << __LINE__ << " ++active_size_ = " << ++active_size_ << std::endl;
 #else
     ++active_size_;
@@ -67,7 +69,7 @@ void History::scrollback() {
   do {
     new_line = L'\n' == active_[first_];
     if (new_line) {
-#if 0
+#if DEBUG_ACTIVE_SIZE
       std::cout << __func__ << " " << __LINE__ << " --active_size_ = " << --active_size_ << std::endl;
 #else
       --active_size_;
@@ -79,7 +81,7 @@ void History::scrollback() {
       if (static_cast<bool>(rune)) {
         scrollback_.push_back(rune);
         rune = rune::Rune(L'\0');
-#if 0
+#if DEBUG_ACTIVE_SIZE
         std::cout << __func__ << " " << __LINE__ << " --active_size_ = " << --active_size_ << std::endl;
 #else
         --active_size_;
@@ -243,6 +245,13 @@ void History::erase_line_right() {
     ++index;
   }
   for (; 0 != index % columns_; ++index) {
+    if (static_cast<bool>(active_[index])) {
+#if DEBUG_ACTIVE_SIZE
+      std::cout << __func__ << " " << __LINE__ << " --active_size_ = " << --active_size_ << std::endl;
+#else
+      --active_size_;
+#endif
+    }
     active_[index] = rune::Rune('\0');
   }
 }
@@ -275,7 +284,7 @@ void History::insert(const int n) {
   std::copy_backward(active_.data() + src, active_.data() + end, active_.data() + dst); 
   for (uint32_t index = last_; last_ + n > index; ++index) {
     if ( ! static_cast<bool>(active_[index].character)) {
-#if 0
+#if DEBUG_ACTIVE_SIZE
       std::cout << __func__ << " " << __LINE__ << " ++active_size_ = " << ++active_size_ << std::endl;
 #else
       ++active_size_;
@@ -367,7 +376,7 @@ void History::new_line() {
   last_ = (last_ + columns_) % active_.size();
   if (is_scrollback_enabled()) {
     assert( ! static_cast<bool>(rune));
-#if 0
+#if DEBUG_ACTIVE_SIZE
     std::cout << __func__ << " " << __LINE__ << " ++active_size_ = " << ++active_size_ << std::endl;
 #else
     ++active_size_;
@@ -377,7 +386,7 @@ void History::new_line() {
     }
   } else /* scrollback is disabled */ {
     if ( ! static_cast<bool>(rune)) {
-#if 0
+#if DEBUG_ACTIVE_SIZE
       std::cout << __func__ << " " << __LINE__ << " ++active_size_ = " << ++active_size_ << std::endl;
 #else
     ++active_size_;
