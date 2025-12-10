@@ -306,11 +306,13 @@ uint16_t Screen::pushCharacter(rune::Rune rune) {
       renderCharacter(drawer.target, rune);
     }
 
-    damage_.emplace(Rectangle{
+    Rectangle r{
       .x = drawer.target.x,
       .y = overflow(),
       .width = drawer.target.width,
-      .height = drawer.target.height, });
+      .height = drawer.target.height, };
+
+    damage_.emplace(std::move(r));
   }
 
   return columns;
@@ -349,8 +351,12 @@ void Screen::repaint(const bool force, const bool alternative) {
     pages_.paint(0);
 #endif
 
-    if (alternative) {
-      draw_cursor(dimensions_.scroll_y());
+    if (alternative && 0 == dimensions_.scroll_y()) {
+      int32_t offset = 0;
+      if (dimensions_.surface_height() > pages_.total_height()) {
+        offset = dimensions_.surface_height() - pages_.total_height();
+      }
+      draw_cursor(offset);
     }
 
     const bool forceSwapBuffers = force || damage_.empty() || FULL == repaint_;
@@ -1007,11 +1013,9 @@ bool Pages::has_alternative() const {
   return result;
 }
 
-void Screen::draw_cursor(const uint64_t offset) const {
+void Screen::draw_cursor(const int32_t offset) const {
   Rectangle target{static_cast<Rectangle>(dimensions_)};
-  if (0 < offset) {
-    return;
-  }
+  target.y = offset;
   glEnable(GL_SCISSOR_TEST);
   target(glScissor);
   colors::white(glClearColor);
@@ -1052,17 +1056,7 @@ uint32_t Damage::area() const {
 
 void Screen::alternative(const bool mode) {
   history_.alternative(mode);
-#if 1
-  if (mode) {
-    dimensions_.clear();
-    repaint_ = FULL;
-  } else {
-    /* maybe it can be optimized */
-    resize(dimensions_.surface_width(), dimensions_.surface_height());
-  }
-#else
-    resize(dimensions_.surface_width(), dimensions_.surface_height());
-#endif
+  resize(dimensions_.surface_width(), dimensions_.surface_height());
 }
 
 void Screen::new_line() {

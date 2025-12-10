@@ -143,7 +143,7 @@ struct Screen {
 private:
   Screen(std::unique_ptr<wayland::Surface> &&);
 
-  auto draw_cursor(const uint64_t) const -> void;
+  auto draw_cursor(const int32_t) const -> void;
   auto draw() -> void;
   auto history() -> History & { return history_; }
   auto makeCurrent() const -> void { surface_->egl().makeCurrent(); }

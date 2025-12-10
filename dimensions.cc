@@ -33,9 +33,9 @@ void Dimensions::clear() {
 }
 
 bool Dimensions::new_line() {
-  if (lines() <= displayed_lines_) {
+  if (lines() == displayed_lines_) {
     overflow_ = 0 < remainder();
-    scrollback_lines_ += 1;
+    ++scrollback_lines_;
     displayed_lines_ = cursor_line_ = lines();
     return true;
   } else {
