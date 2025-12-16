@@ -19,13 +19,14 @@ public:
 
   auto area() const -> uint32_t { return surface_width_ * surface_height_; }
   auto backspace() -> void;
-  auto clear() -> void;
   auto cursor_column() const { return cursor_column_; }
   auto cursor_column(const uint16_t) -> void;
   auto cursor_line() const { return cursor_line_; }
   auto cursor_line(const uint16_t) -> void;
   auto displayed_lines() const { return displayed_lines_; }
   auto displayed_lines(const uint16_t v) -> void;
+  auto enable_overflow(const bool v) { enable_overflow_ = v; }
+  auto erase_display() -> void;
   auto glyph_descender() const { return glyph_descender_; }
   auto glyph_descender(const auto v) { glyph_descender_ = v; }
   auto glyph_width() const { return glyph_width_; }
@@ -34,7 +35,7 @@ public:
   auto line_height(const auto v) { line_height_ = v; }
   auto move_cursor(const uint16_t, const uint16_t) -> void;
   auto new_line() -> bool;
-  auto overflow() const { return overflow_; }
+  auto overflow() const { return enable_overflow_ && overflow_; }
   auto reset(freetype::Face & face, const uint16_t, const uint16_t) -> void;
   auto scroll_y() const { return scroll_y_; }
   auto scroll_y(const auto v) { scroll_y_ = v; }
@@ -120,6 +121,7 @@ private:
   uint64_t scrollback_lines_ = 0; // memory is the limit really.
   bool overflow_ = false; // whether the cursor reached the end of the screen.
   bool wrap_next_ = false; // cursor went beyond columns.
+  bool enable_overflow_ = true; // enable / disable overflow.
 
   friend std::ostream & operator << (std::ostream &, const Dimensions &);
 };

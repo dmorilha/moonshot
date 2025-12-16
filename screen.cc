@@ -352,11 +352,7 @@ void Screen::repaint(const bool force, const bool alternative) {
 #endif
 
     if (alternative && 0 == dimensions_.scroll_y()) {
-      int32_t offset = 0;
-      if (dimensions_.surface_height() > pages_.total_height()) {
-        offset = dimensions_.surface_height() - pages_.total_height();
-      }
-      draw_cursor(offset);
+      draw_cursor(overflow());
     }
 
     const bool forceSwapBuffers = force || damage_.empty() || FULL == repaint_;
@@ -387,13 +383,14 @@ void Screen::move_cursor(const int column, const int line) {
 }
 
 void Screen::reverse_line_feed() {
-  const uint16_t line = Screen::line() - 1;
-  assert(lines() > line);
-  if (0 < line) {
-    dimensions_.move_cursor(column(), line);
-    history_.move_cursor(column(), line);
+  const uint16_t line = Screen::line();
+  assert(0 < line);
+  assert(lines() >= line);
+  if (1 == line) {
+    history_.reverse_line_feed();
+    resize(dimensions_.surface_width(), dimensions_.surface_height());
   } else {
-    std::cerr << __FILE__ << ":" << __LINE__ << " (" << __func__ << ") scrolling has not been implemented here." << std::endl;
+    history_.move_cursor(column(), line - 1);
   }
 }
 
@@ -788,7 +785,7 @@ void Screen::move_cursor_up(const int n) {
 }
 
 void Screen::erase_display() {
-  dimensions_.clear();
+  dimensions_.erase_display();
   history_.erase_display();
   repaint_ = FULL;
 }
@@ -1055,6 +1052,7 @@ uint32_t Damage::area() const {
 }
 
 void Screen::alternative(const bool mode) {
+  dimensions_.enable_overflow( ! mode);
   history_.alternative(mode);
   resize(dimensions_.surface_width(), dimensions_.surface_height());
 }

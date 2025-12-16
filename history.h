@@ -42,6 +42,7 @@ public:
   auto rbegin() const -> ReverseIterator { return scrollback_.rbegin(); }
   auto rend() const -> ReverseIterator { return scrollback_.rend(); }
   auto resize(const uint16_t, const uint16_t) -> void;
+  auto reverse_line_feed() -> void;
   auto reverse_iterator(const uint64_t) -> ReverseIterator;
   auto scrollback_size() const -> uint64_t { return scrollback_.size(); }
   auto size() const -> uint64_t;

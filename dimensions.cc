@@ -26,7 +26,7 @@ std::ostream & operator << (std::ostream & o, const Dimensions & d) {
   return o;
 }
 
-void Dimensions::clear() {
+void Dimensions::erase_display() {
   scrollback_lines_ += displayed_lines_ - 1;
   displayed_lines_ = 1;
   overflow_ = false;
