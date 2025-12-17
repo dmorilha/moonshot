@@ -485,18 +485,56 @@ void History::reverse_line_feed() {
       active_[first_] = rune::Rune(L'\n');
     }
 
+    if ( ! scrollback_.empty()) {
+      assert(L'\n' == scrollback_.back());
+      scrollback_.pop_back();
+    }
+
+    Container::const_reverse_iterator back_iterator = scrollback_.crbegin();
+    for (uint16_t i = 1; columns_ > i && scrollback_.crend() != back_iterator; ++i, ++back_iterator) {
+      if (L'\n' == *back_iterator) {
+        break;
+      }
+    }
+    Container::const_reverse_iterator iterator = back_iterator;
+    if (scrollback_.crend() != iterator && L'\n' == *iterator) {
+      --iterator;
+    }
     for (uint32_t index = 1; columns_ > index; ++index) {
-      if (static_cast<bool>(active_[first_ + index])) {
+      const bool has_rune = static_cast<bool>(active_[first_ + index]);
+      if (scrollback_.crbegin() < iterator && scrollback_.crend() > iterator) {
+        active_[first_ + index] = *iterator;
+        --iterator;
+        if ( ! has_rune) {
 #if DEBUG_ACTIVE_SIZE
-      std::cout << __func__ << " " << __LINE__ << " --active_size_ = " << --active_size_ << std::endl;
+          std::cout << __func__ << " " << __LINE__ << " ++active_size_ = " << ++active_size_ << std::endl;
 #else
-      --active_size_;
+          ++active_size_;
 #endif
-        // TODO: we should actually copy the last line from the scrollback_ buffer.
+        }
+      } else if (has_rune) {
+#if DEBUG_ACTIVE_SIZE
+        std::cout << __func__ << " " << __LINE__ << " --active_size_ = " << --active_size_ << std::endl;
+#else
+        --active_size_;
+#endif
         active_[first_ + index] = rune::Rune(L'\0');
       }
     }
+    {
+      const std::size_t distance = std::distance(scrollback_.crbegin(), back_iterator);
+      assert(scrollback_.size() > distance);
+      for (uint16_t i = 0; distance > i; ++i) {
+        scrollback_.pop_back();
+      }
+    }
   }
+
+  if ( ! scrollback_.empty() && L'\n' != scrollback_.back()) {
+    scrollback_.emplace_back(rune::Rune{L'\n'});
+  }
+
+  // moves last_ back one line + one positions
   if (columns_ > last_) {
     last_ = active_.size() - columns_ + (last_ % columns_);
   } else {
