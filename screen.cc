@@ -266,9 +266,12 @@ void Screen::pushBack(rune::Rune && rune) {
     return;
   }
 
-  const uint16_t columns = pushCharacter(rune);
+  if ( ! long_transaction_) {
+    const uint16_t columns = pushCharacter(rune);
+    dimensions_.cursor_column(column() + columns);
+  }
+
   history_.emplace(std::move(rune));
-  dimensions_.cursor_column(column() + columns);
 }
 
 uint16_t Screen::pushCharacter(rune::Rune rune) {
