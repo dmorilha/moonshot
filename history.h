@@ -24,7 +24,9 @@ public:
   auto alternative(const bool) -> void;
   auto at(const uint32_t) const -> const rune::Rune &;
   auto at(const uint16_t, const uint16_t) const -> const rune::Rune &;
+  auto begin(const uint64_t) -> void { long_transaction_ = 1; }
   auto columns() const { return columns_; }
+  auto commit() -> void { long_transaction_ = 0; }
   auto erase_display() -> void;
   auto erase_scrollback() -> void { scrollback_.clear(); }
   auto carriage_return() -> void;
@@ -59,8 +61,8 @@ private:
   /*
    * The difference between `scrollback_` and `active_` is that `scrollback_`
    * is a compressed representation of the screen, while `active_` is expanded
-   * in the sense that each character is in the right column and line
-   * coordinate, considering a circular buffer.
+   * in the sense that each character is in the right column and line coordinate,
+   * considering a circular buffer.
    * Nonprintables are mostly excluded, and the new line character goes at
    * "column 0" in the `active_` container, therefore there is one additional
    * column.
@@ -81,9 +83,12 @@ private:
   uint32_t first_ = 0;
   uint32_t last_ = 0;
 
+  // alternative container
   Container saved_;
   uint16_t saved_columns_ = 0;
   uint32_t saved_first_ = 0;
   uint32_t saved_last_ = 0;
   uint32_t saved_size_ = 0;
+
+  uint64_t long_transaction_ = 0;
 };

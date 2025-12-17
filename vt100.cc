@@ -1211,18 +1211,24 @@ void vt100::handleEscape(const char * const sequence, const int length) {
   }
 }
 
+struct ScreenAutoCommit {
+  ~ScreenAutoCommit() { screen_.commit(); }
+  ScreenAutoCommit(Screen & s) : screen_(s) { }
+  auto begin(const uint64_t size = 0) -> void { screen_.begin(size); }
+  Screen & screen_;
+};
+
 bool vt100::pollin(const std::optional<TimePoint> & t) {
+  ScreenAutoCommit auto_commit(screen_);
   while (true) {
     while (bufferIndex_ < bufferSize_) {
       wchar_t character = 0;
       {
         const ssize_t size = bufferSize_ - bufferIndex_;
-#if 1
+        if (2048 <= size) {
+          auto_commit.begin(size);
+        }
         const ssize_t bytes = mbrtowc(&character, &buffer_[bufferIndex_], size, /* mbstate_t = */ nullptr);
-#else
-        const ssize_t bytes = 1;
-        character = static_cast<wchar_t>(buffer_[bufferIndex_]);
-#endif
         assert(4 >= bytes);
         if (bytes > size) {
           std::cerr << __func__ << " " << bytes << " " << size << std::endl;
@@ -1284,6 +1290,9 @@ bool vt100::pollin(const std::optional<TimePoint> & t) {
           assert(!"ERROR");
         }
       } else {
+        if (2048 <= size) {
+          auto_commit.begin(size);
+        }
         bufferSize_ = bufferStart_ + size;
         assert(buffer_.size() >= bufferSize_);
         if (0 == size) {

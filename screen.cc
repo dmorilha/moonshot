@@ -1061,3 +1061,18 @@ void Screen::new_line() {
   Rectangle_Y rectangle = static_cast<Rectangle_Y>(dimensions_);
   pages_.draw(rectangle, history_.size());
 }
+
+/* transaction */
+void Screen::begin(const uint64_t size) {
+  history_.begin(size);
+  long_transaction_ = true;
+}
+
+void Screen::commit() {
+  history_.commit();
+  if ( ! long_transaction_) {
+    return;
+  }
+  resize(dimensions_.surface_width(), dimensions_.surface_height());
+  long_transaction_ = false;
+}

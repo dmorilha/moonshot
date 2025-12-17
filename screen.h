@@ -58,7 +58,7 @@ public:
     friend class Pages;
   };
 
-  Pages(const uint8_t cap = 0) : cap_(cap) { }
+  Pages(const uint8_t cap = 0) : cap_(cap) { assert( 1 < cap_); }
 
   auto draw(Rectangle_Y, const uint64_t) -> Drawer;
   auto emplace_front(const int32_t) -> Entry &;
@@ -117,11 +117,11 @@ struct Screen {
 
   auto alternative(const bool) -> void;
   auto backspace() -> void;
-  auto begin() -> void { }
+  auto begin(const uint64_t size = 0) -> void;
   auto changeScrollY(int32_t) -> void;
   auto column() const -> int32_t { return dimensions_.cursor_column(); }
   auto columns() const -> int32_t { return dimensions_.columns(); }
-  auto commit() -> void { }
+  auto commit() -> void;
   auto drag(const uint16_t, const uint16_t) -> void;
   auto erase(const int) -> void;
   auto erase_display() -> void;
@@ -159,9 +159,10 @@ private:
   CharacterMap characters_;
   Dimensions dimensions_;
   History history_;
-  Pages pages_{/* total number of entries */ 2};
+  Pages pages_{/* total number of entries, where 2 is the minimum */ 2};
   Damage damage_;
   Repaint repaint_ = NO;
   opengl::Shader glProgram_;
   std::unique_ptr<wayland::Surface> surface_;
+  bool long_transaction_ = false;
 };

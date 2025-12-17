@@ -14,6 +14,7 @@ void History::emplace(rune::Rune rune) {
   if (rune.iscontrol()) {
     switch (rune.character) {
     case L'\n':
+      assert(!"UNRECHEABLE");
       return;
 
     case L'\t': // horizontal tab
@@ -27,6 +28,10 @@ void History::emplace(rune::Rune rune) {
       assert(!"UNRECHEABLE");
       return;
     }
+  }
+
+  if (0 < long_transaction_) {
+    ++long_transaction_;
   }
 
   ++last_;
