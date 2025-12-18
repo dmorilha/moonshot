@@ -3,32 +3,12 @@
 #pragma once
 
 #include <array>
-#include <map>
 
 #include "terminal.h"
 
 struct vt100 : public Terminal {
   vt100(Screen &);
-
-  const std::map<int, Color> Colors {
-    {30, colors::black},
-    {31, colors::red},
-    {32, colors::green},
-    {33, colors::yellow},
-    {34, colors::blue},
-    {35, colors::magenta},
-    {36, colors::cyan},
-    {37, colors::white},
-    {40, colors::black},
-    {41, colors::red},
-    {42, colors::green},
-    {43, colors::yellow},
-    {44, colors::blue},
-    {45, colors::magenta},
-    {46, colors::cyan},
-    {47, colors::white},
-  };
-
+protected:
   void handleEscape(const char * const, const int);
 
 private:
@@ -52,7 +32,7 @@ private:
   void handleOSC(const char);
   void handlePM(const char);
   void handleSGR();
-  Color handleSGRColor(const std::vector<const char *> &);
+  Color handleSGRColor(const std::vector<int> &);
   void handleSGRCommand(const int);
 
   void reportDeviceStatus(const int32_t);

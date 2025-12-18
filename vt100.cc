@@ -12,7 +12,7 @@
 #include "screen.h"
 #include "vt100.h"
 
-#define DEBUG_ESCAPE_SEQUENCE 0
+#define DEBUG_ESCAPE_SEQUENCE 1
 
 vt100::vt100(Screen & screen) : Terminal(screen) { }
 
@@ -378,16 +378,13 @@ void vt100::handleSGRCommand(const int command) {
     break;
 
   case 30 ... 37:
-    /* set fg color palette */
-    {
-      const auto iterator = Colors.find(command);
-      if (Colors.cend() != iterator) {
-        rune_factory_.foreground_color = iterator->second;
-      }
-    } break;
+    /* set foreground color */
+    rune_factory_.foreground_color = handleSGRColor({ 38, 5, command - 30, });
+    break;
 
   case 38:
     /* foreground color */
+    assert(!"UNRECHEABLE");
     break;
 
   case 39:
@@ -396,16 +393,13 @@ void vt100::handleSGRCommand(const int command) {
     break;
 
   case 40 ... 47:
-    /* set background color to default, ecma 48 3rd */
-    {
-      const auto iterator = Colors.find(command);
-      if (Colors.cend() != iterator) {
-        rune_factory_.background_color = iterator->second;
-      }
-    } break;
+    /* set background color */
+    rune_factory_.background_color = handleSGRColor({ 48,  5, command - 40, });
+    break;
 
   case 48:
     /* background color */
+    assert(!"UNRECHEABLE");
     break;
 
   case 49:
@@ -449,15 +443,13 @@ void vt100::handleSGRCommand(const int command) {
     break;
 
   case 90 ... 97:
-    /* set fg color palette */
-    handleSGRCommand(command - 60);
-    // assert(!"UNIMPLEMENTED");
+    /* set foreground color from palette */
+    rune_factory_.foreground_color = handleSGRColor({ 38, 5, command - 82, });
     break;
 
   case 100 ... 107:
-    /* set background color palette */
-    handleSGRCommand(command - 60);
-    // assert(!"UNIMPLEMENTED");
+    /* set background color from palette */
+    rune_factory_.background_color = handleSGRColor({ 48, 5, command - 92, });
     break;
 
   default:
@@ -468,11 +460,11 @@ void vt100::handleSGRCommand(const int command) {
 }
 
 void vt100::handleSGR() {
-  std::vector<const char *> codes;
-
 #if DEBUG_ESCAPE_SEQUENCE
   std::cerr << "Full SGR escape sequence " << escapeSequence_.data() << " " << std::endl;
 #endif
+
+  std::vector<int> codes;
 
   if (1 < escapeSequence_.size()) {
     const EscapeSequence::iterator END = escapeSequence_.end();
@@ -483,7 +475,7 @@ void vt100::handleSGR() {
       if (':' == *iterator || ';' == *iterator || '\0' == *iterator) {
         *iterator = '\0';
         assert(END != token);
-        codes.push_back(token.base());
+        codes.push_back(atoi(token.base()));
         token = ++iterator;
       } else {
         if ('0' > *iterator || '9' < *iterator) {
@@ -499,13 +491,12 @@ void vt100::handleSGR() {
   }
 
   /* requires a color parser */
-  if (0 == strcmp("38", codes[0]) || 0 == strcmp("48", codes[0])) {
+  if (38 == codes[0] || 48 == codes[0] || 58 == codes[0]) {
     const Color color = handleSGRColor(codes);
     return;
   }
 
-  for (const char * const code : codes) {
-    const int command = std::atoi(code);
+  for (const int command : codes) {
     handleSGRCommand(command);
   }
 }
@@ -764,19 +755,19 @@ void vt100::handleCSI(const char c) {
             stream >> delimiter;
             assert(';' == delimiter);
             stream >> bottom;
-            top = std::max<int64_t>(1, top);
+            top = std::min<int64_t>(1, top);
             bottom = 1 > bottom ? screen_.lines() - 1 : bottom;
             --top;
             --bottom;
-            std::cout << top << ", " << bottom << std::endl;
           } else {
-            assert(!"unimplemented");
+            assert(!"UNIMPLEMENTED");
           }
 
           if (bottom > top) {
             screen_.move_cursor(1, 1);
+            /* sets scroll region top and bottom */
           } else {
-            assert(!"invalid DECSTBM sequence");
+            assert(!"INVALID DECSTBM SEQUENCE");
           }
         } break;
 
@@ -1205,11 +1196,92 @@ void vt100::reportDeviceStatus(const int argument) {
   }
 }
 
-Color vt100::handleSGRColor(const std::vector<const char *> & codes) {
-  for (auto component : codes) {
-    std::cout << component << ", ";
+Color vt100::handleSGRColor(const std::vector<int> & codes) {
+  if (5 == codes[1]) {
+    const float alpha = 1.f;
+    int16_t index = codes[2];
+#if 0 /* not sure if this is really needed */
+    index = std::min(index, 255);
+#endif
+    assert(0 <= index);
+    if (8  > index) /* background */ {
+      switch (index) {
+      case 0:
+        return colors::black;
+        break;
+      case 1:
+        return colors::red;
+        break;
+      case 2:
+        return colors::green;
+        break;
+      case 3:
+        return colors::yellow;
+        break;
+      case 4:
+        return colors::blue;
+        break;
+      case 5:
+        return colors::magenta;
+        break;
+      case 6:
+        return colors::cyan;
+        break;
+      case 7:
+        return colors::white;
+        break;
+      default:
+        assert(!"UNRECHEABLE");
+        break;
+      }
+    } else if (16  > index) {
+      switch (index) {
+      case 8:
+        assert(!"UNIMPLEMENTED");
+        break;
+      case 9:
+        assert(!"UNIMPLEMENTED");
+        break;
+      case 10:
+        assert(!"UNIMPLEMENTED");
+        break;
+      case 11:
+        assert(!"UNIMPLEMENTED");
+        break;
+      case 12:
+        assert(!"UNIMPLEMENTED");
+        break;
+      case 13:
+        assert(!"UNIMPLEMENTED");
+        break;
+      case 14:
+        assert(!"UNIMPLEMENTED");
+        break;
+      case 15:
+        assert(!"UNIMPLEMENTED");
+        break;
+      default:
+        assert(!"UNRECHEABLE");
+        break;
+      }
+    } else if (232 > index) /* "extended" */ {
+        int16_t i = index - 16;
+        const float blue = ((i % 6) * 255) / 5.0;
+        i /= 6;
+        const float green = ((i  % 6) * 255) / 5.0;
+        i /= 6;
+        const float red = ((i % 6) * 255) / 5.0;
+        return Color(red, blue, green, alpha);
+    } else if (256 < index) /* grayscale */ {
+        const float i = ((index - 232) * 10 + 8) / 256.0 * 255.0;
+        return Color(i, i, i, alpha);
+    } else {
+      std::cerr << "color index " << index << std::endl;
+      assert(!"OUT OF BOUND COLOR");
+    }
+  } else {
+    assert(!"UNIMPLEMENTED");
   }
-  std::cout << std::endl;
   return colors::white;
 }
 
