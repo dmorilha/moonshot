@@ -12,6 +12,8 @@
 #include "screen.h"
 #include "vt100.h"
 
+#define DEBUG_ESCAPE_SEQUENCE 0
+
 vt100::vt100(Screen & screen) : Terminal(screen) { }
 
 void vt100::handleDecMode(const unsigned int code, const bool mode) {
@@ -468,7 +470,9 @@ void vt100::handleSGRCommand(const int command) {
 void vt100::handleSGR() {
   std::vector<const char *> codes;
 
+#if DEBUG_ESCAPE_SEQUENCE
   std::cerr << "Full SGR escape sequence " << escapeSequence_.data() << " " << std::endl;
+#endif
 
   if (1 < escapeSequence_.size()) {
     const EscapeSequence::iterator END = escapeSequence_.end();
@@ -519,7 +523,9 @@ void vt100::handleCSI(const char c) {
   if (terminated) {
     escapeSequence_.push_back('\0');
     assert(1 < escapeSequence_.size());
+#if DEBUG_ESCAPE_SEQUENCE
     std::cerr << "Full CSI escape sequence " << escapeSequence_.data() << std::endl;
+#endif
     const char firstCharacter = escapeSequence_[0],
       lastCharacter = escapeSequence_[escapeSequence_.size() - 2],
       secondLastCharacter = escapeSequence_.size() < 3 ? '\0' :
@@ -965,7 +971,9 @@ vt100::CharacterType vt100::handleCharacter(const wchar_t c) {
     break;
 
   case ESCAPE:
+#if DEBUG_ESCAPE_SEQUENCE
     std::cerr << "Escape sequence " << static_cast<char>(c) << std::endl;
+#endif
     switch (c) {
     case '[':
       state_ = CSI;
@@ -1028,12 +1036,12 @@ vt100::CharacterType vt100::handleCharacter(const wchar_t c) {
       break;
     case '=':
       /* application keypad */
-      std::cerr << "set application keypad mode" << std::endl;
+      std::cout << "set application keypad mode (currently has no actual effect)" << std::endl;
       state_ = LITERAL;
       break;
     case '>':
       /* normal keypad */
-      std::cerr << "set normal keypad mode" << std::endl;
+      std::cout << "set normal keypad mode (currently has no actual effect)" << std::endl;
       state_ = LITERAL;
       break;
     case '`':
@@ -1251,11 +1259,12 @@ bool vt100::pollin(const std::optional<TimePoint> & t) {
 
         case -1: /* invalid */
           std::cerr << "problems with utf-8: invalid number of bytes" << std::endl;
-          assert(!"invalid");
+          assert(!"INVALID");
           break;
 
         case 0:
           std::cerr << "odd" << std::endl;
+          assert(!"UNRECHEABLE");
           assert(0 == character);
           break;
 
